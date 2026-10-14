@@ -108,28 +108,29 @@
 
     <!-- ビュー切り替え ＆ コントロール -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <!-- 順番を元の「ToDo -> カレンダー -> 講義一覧」に復元 -->
       <div class="flex bg-slate-200/80 p-1 rounded-xl text-xs font-semibold">
-        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm">
-          <i class="fa-regular fa-calendar-days mr-1.5 text-blue-600"></i>カレンダー
+        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm">
+          <i class="fa-solid fa-list-check mr-1.5 text-blue-600"></i>ToDoリスト
         </button>
-        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900">
-          <i class="fa-solid fa-list-check mr-1.5"></i>ToDoリスト
+        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900">
+          <i class="fa-regular fa-calendar-days mr-1.5"></i>カレンダー
         </button>
         <button id="tab-lectures" onclick="switchTab('lectures')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900">
           <i class="fa-solid fa-book-bookmark mr-1.5"></i>講義一覧
         </button>
       </div>
 
-      <!-- カレンダー用のトグル -->
-      <label id="toggle-container-calendar" class="flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
-        <input type="checkbox" id="hide-completed-calendar" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
-        <span>カレンダー: 完了を隠す</span>
-      </label>
-
       <!-- ToDo用のトグル -->
-      <label id="toggle-container-todo" class="hidden flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
+      <label id="toggle-container-todo" class="flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
         <input type="checkbox" id="hide-completed-todo" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-0">
         <span>ToDo: 完了を隠す</span>
+      </label>
+
+      <!-- カレンダー用のトグル -->
+      <label id="toggle-container-calendar" class="hidden flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
+        <input type="checkbox" id="hide-completed-calendar" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
+        <span>カレンダー: 完了を隠す</span>
       </label>
 
       <!-- 講義一覧用のトグル -->
@@ -139,8 +140,15 @@
       </label>
     </div>
 
-    <!-- VIEW: CALENDAR (デフォルト表示) -->
-    <section id="view-calendar" class="space-y-4">
+    <!-- VIEW: TODO LIST (デフォルト表示) -->
+    <section id="view-todo" class="space-y-6">
+      <div id="todo-groups-container" class="space-y-6">
+        <!-- JSで描画 -->
+      </div>
+    </section>
+
+    <!-- VIEW: CALENDAR -->
+    <section id="view-calendar" class="hidden space-y-4">
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div class="flex items-center space-x-2">
@@ -166,13 +174,6 @@
         <div id="calendar-days-grid" class="calendar-grid divide-x divide-y divide-slate-100 border-b border-slate-100">
           <!-- JSで描画 -->
         </div>
-      </div>
-    </section>
-
-    <!-- VIEW: TODO LIST -->
-    <section id="view-todo" class="hidden space-y-6">
-      <div id="todo-groups-container" class="space-y-6">
-        <!-- JSで描画 -->
       </div>
     </section>
 
@@ -267,16 +268,16 @@
     const LOCAL_STORAGE_KEY = 'forgetting_curve_hybrid_v1';
     let appData = { lectures: [], otherTasks: [] };
     let calendarCurrentDate = new Date();
-    let currentViewTab = 'calendar'; // 💡 デフォルト表示を「カレンダー」に変更
+    let currentViewTab = 'todo'; // デフォルト表示をToDoリストに戻す
     let activeShiftContext = { type: 'cycle', id: null, key: null, oldDate: null };
     let draggedTask = null;
 
     window.addEventListener('DOMContentLoaded', () => {
       loadLocalData();
 
-      // URLハッシュ（#todo, #calendar, #lectures）の判定
+      // URLハッシュ（#todo, #calendar, #lectures）の判定（指定があればそちらを優先）
       const hash = window.location.hash.replace('#', '');
-      if (['calendar', 'todo', 'lectures'].includes(hash)) {
+      if (['todo', 'calendar', 'lectures'].includes(hash)) {
         currentViewTab = hash;
       }
       switchTab(currentViewTab);
@@ -407,7 +408,7 @@
       window.location.hash = tab;
 
       // タブごとの切り替え
-      ['calendar', 'todo', 'lectures'].forEach(t => {
+      ['todo', 'calendar', 'lectures'].forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         const view = document.getElementById(`view-${t}`);
         if (t === tab) {
@@ -420,18 +421,18 @@
       });
 
       // トグルの表示切り替え
-      const toggleCal = document.getElementById('toggle-container-calendar');
       const toggleTodo = document.getElementById('toggle-container-todo');
+      const toggleCal = document.getElementById('toggle-container-calendar');
       const toggleLec = document.getElementById('toggle-container-lectures');
 
-      toggleCal.classList.add('hidden');
       toggleTodo.classList.add('hidden');
+      toggleCal.classList.add('hidden');
       toggleLec.classList.add('hidden');
 
-      if (tab === 'calendar') {
-        toggleCal.classList.remove('hidden');
-      } else if (tab === 'todo') {
+      if (tab === 'todo') {
         toggleTodo.classList.remove('hidden');
+      } else if (tab === 'calendar') {
+        toggleCal.classList.remove('hidden');
       } else if (tab === 'lectures') {
         toggleLec.classList.remove('hidden');
       }
@@ -440,82 +441,9 @@
     }
 
     function renderCurrentView() {
-      if (currentViewTab === 'calendar') renderCalendarView();
       if (currentViewTab === 'todo') renderToDoView();
+      if (currentViewTab === 'calendar') renderCalendarView();
       if (currentViewTab === 'lectures') renderLecturesView();
-    }
-
-    /* VIEW: CALENDAR */
-    function renderCalendarView() {
-      const year = calendarCurrentDate.getFullYear();
-      const month = calendarCurrentDate.getMonth();
-      const hideCompleted = document.getElementById('hide-completed-calendar').checked;
-
-      document.getElementById('calendar-month-year').innerText = `${year}年 ${month + 1}月`;
-      const grid = document.getElementById('calendar-days-grid');
-      grid.innerHTML = '';
-
-      const firstDay = new Date(year, month, 1).getDay();
-      const lastDate = new Date(year, month + 1, 0).getDate();
-      const todayStr = formatDateISO(new Date());
-
-      let calendarMap = {};
-
-      appData.lectures.forEach(lec => {
-        Object.keys(lec.blocks).forEach(key => {
-          const b = lec.blocks[key];
-          if (hideCompleted && b.completed) return;
-          if (!calendarMap[b.date]) calendarMap[b.date] = [];
-          calendarMap[b.date].push({ type: 'cycle', id: lec.id, title: lec.title, key: key, completed: b.completed });
-        });
-      });
-
-      appData.otherTasks.forEach(st => {
-        if (hideCompleted && st.completed) return;
-        if (!calendarMap[st.date]) calendarMap[st.date] = [];
-        calendarMap[st.date].push({ type: 'other', id: st.id, title: st.title, key: 'OTHER', completed: st.completed });
-      });
-
-      for (let i = 0; i < firstDay; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'min-h-[80px] p-1 bg-slate-50/50 text-slate-300 text-xs';
-        grid.appendChild(cell);
-      }
-
-      for (let day = 1; day <= lastDate; day++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const isToday = dateStr === todayStr;
-        const tasks = calendarMap[dateStr] || [];
-
-        const cell = document.createElement('div');
-        cell.className = `min-h-[80px] p-1 border-t border-slate-100 transition drop-zone ${isToday ? 'bg-blue-50/40' : ''}`;
-        cell.setAttribute('data-date', dateStr);
-
-        cell.addEventListener('dragover', (e) => { e.preventDefault(); cell.classList.add('drag-over'); });
-        cell.addEventListener('dragleave', () => { cell.classList.remove('drag-over'); });
-        cell.addEventListener('drop', (e) => {
-          e.preventDefault();
-          cell.classList.remove('drag-over');
-          if (draggedTask) handleTaskDrop(draggedTask, dateStr);
-        });
-
-        let badgesHTML = tasks.map(t => {
-          const colorClass = getTaskColorClass(t.key);
-          return `
-            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white ${colorClass} mb-1 cursor-pointer font-medium ${t.completed ? 'opacity-40 line-through' : ''}">
-              ${escapeHTML(t.title)}
-            </div>
-          `;
-        }).join('');
-
-        cell.innerHTML = `
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-700'}">${day}</span>
-          </div>
-          <div class="space-y-0.5 max-h-14 overflow-y-auto">${badgesHTML}</div>
-        `;
-        grid.appendChild(cell);
-      }
     }
 
     /* VIEW: TODO */
@@ -641,6 +569,79 @@
 
         container.appendChild(groupEl);
       });
+    }
+
+    /* VIEW: CALENDAR */
+    function renderCalendarView() {
+      const year = calendarCurrentDate.getFullYear();
+      const month = calendarCurrentDate.getMonth();
+      const hideCompleted = document.getElementById('hide-completed-calendar').checked;
+
+      document.getElementById('calendar-month-year').innerText = `${year}年 ${month + 1}月`;
+      const grid = document.getElementById('calendar-days-grid');
+      grid.innerHTML = '';
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      const todayStr = formatDateISO(new Date());
+
+      let calendarMap = {};
+
+      appData.lectures.forEach(lec => {
+        Object.keys(lec.blocks).forEach(key => {
+          const b = lec.blocks[key];
+          if (hideCompleted && b.completed) return;
+          if (!calendarMap[b.date]) calendarMap[b.date] = [];
+          calendarMap[b.date].push({ type: 'cycle', id: lec.id, title: lec.title, key: key, completed: b.completed });
+        });
+      });
+
+      appData.otherTasks.forEach(st => {
+        if (hideCompleted && st.completed) return;
+        if (!calendarMap[st.date]) calendarMap[st.date] = [];
+        calendarMap[st.date].push({ type: 'other', id: st.id, title: st.title, key: 'OTHER', completed: st.completed });
+      });
+
+      for (let i = 0; i < firstDay; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'min-h-[80px] p-1 bg-slate-50/50 text-slate-300 text-xs';
+        grid.appendChild(cell);
+      }
+
+      for (let day = 1; day <= lastDate; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        const tasks = calendarMap[dateStr] || [];
+
+        const cell = document.createElement('div');
+        cell.className = `min-h-[80px] p-1 border-t border-slate-100 transition drop-zone ${isToday ? 'bg-blue-50/40' : ''}`;
+        cell.setAttribute('data-date', dateStr);
+
+        cell.addEventListener('dragover', (e) => { e.preventDefault(); cell.classList.add('drag-over'); });
+        cell.addEventListener('dragleave', () => { cell.classList.remove('drag-over'); });
+        cell.addEventListener('drop', (e) => {
+          e.preventDefault();
+          cell.classList.remove('drag-over');
+          if (draggedTask) handleTaskDrop(draggedTask, dateStr);
+        });
+
+        let badgesHTML = tasks.map(t => {
+          const colorClass = getTaskColorClass(t.key);
+          return `
+            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white ${colorClass} mb-1 cursor-pointer font-medium ${t.completed ? 'opacity-40 line-through' : ''}">
+              ${escapeHTML(t.title)}
+            </div>
+          `;
+        }).join('');
+
+        cell.innerHTML = `
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-700'}">${day}</span>
+          </div>
+          <div class="space-y-0.5 max-h-14 overflow-y-auto">${badgesHTML}</div>
+        `;
+        grid.appendChild(cell);
+      }
     }
 
     function handleTaskDrop(task, targetDate) {
