@@ -24,11 +24,11 @@
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
     .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
     .task-card { cursor: grab; user-select: none; transition: transform 0.15s, opacity 0.15s; }
     .task-card:active { cursor: grabbing; opacity: 0.7; }
-    .drag-over { background-color: rgba(59, 130, 246, 0.2) !important; border-style: dashed !important; }
+    .drag-over { background-color: rgba(37, 99, 235, 0.1) !important; border-style: dashed !important; border-color: #2563eb !important; }
   </style>
 
   <!-- Firebase (クラウド同期用SDK) -->
@@ -78,25 +78,25 @@
 <body class="antialiased min-h-screen flex flex-col">
 
   <!-- ヘッダー -->
-  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-md">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
     <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
           <i class="fa-solid fa-cloud"></i>
         </div>
         <div>
-          <h1 class="font-bold text-base text-white leading-tight">復習マネージャー</h1>
-          <span id="sync-status-badge" class="text-[11px] text-emerald-400 font-semibold flex items-center mt-0.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1"></span> 同期中
+          <h1 class="font-bold text-base text-slate-900 leading-tight">復習マネージャー</h1>
+          <span id="sync-status-badge" class="text-[11px] text-emerald-600 font-semibold flex items-center mt-0.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1"></span> クラウド自動同期中
           </span>
         </div>
       </div>
 
       <div class="flex items-center space-x-2">
-        <button onclick="openNewOtherModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition">
-          <i class="fa-solid fa-plus mr-1 text-blue-400"></i> タスク
+        <button onclick="openNewOtherModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition border border-slate-200">
+          <i class="fa-solid fa-plus mr-1 text-blue-600"></i> タスク
         </button>
-        <button onclick="openNewLectureModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-full font-medium text-xs flex items-center transition shadow">
+        <button onclick="openNewLectureModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-full font-medium text-xs flex items-center transition shadow-sm">
           <i class="fa-solid fa-layer-group mr-1"></i> 講義サイクル
         </button>
       </div>
@@ -108,32 +108,32 @@
 
     <!-- ビュー切り替え ＆ コントロール -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <div class="flex bg-slate-800 p-1 rounded-xl text-xs font-semibold">
-        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg bg-blue-600 text-white shadow">
-          <i class="fa-solid fa-list-check mr-1.5"></i>ToDoリスト
+      <div class="flex bg-slate-200/80 p-1 rounded-xl text-xs font-semibold">
+        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm">
+          <i class="fa-solid fa-list-check mr-1.5 text-blue-600"></i>ToDoリスト
         </button>
-        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white">
+        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900">
           <i class="fa-regular fa-calendar-days mr-1.5"></i>カレンダー
         </button>
-        <button id="tab-lectures" onclick="switchTab('lectures')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white">
+        <button id="tab-lectures" onclick="switchTab('lectures')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900">
           <i class="fa-solid fa-book-bookmark mr-1.5"></i>講義一覧
         </button>
       </div>
 
       <!-- ToDo用のトグル -->
-      <label id="toggle-container-todo" class="flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+      <label id="toggle-container-todo" class="flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
         <input type="checkbox" id="hide-completed-todo" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-0">
         <span>ToDo: 完了を隠す</span>
       </label>
 
       <!-- カレンダー用のトグル -->
-      <label id="toggle-container-calendar" class="hidden flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+      <label id="toggle-container-calendar" class="hidden flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
         <input type="checkbox" id="hide-completed-calendar" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
         <span>カレンダー: 完了を隠す</span>
       </label>
 
       <!-- 講義一覧用のトグル -->
-      <label id="toggle-container-lectures" class="hidden flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+      <label id="toggle-container-lectures" class="hidden flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
         <input type="checkbox" id="hide-completed-lectures" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
         <span>講義一覧: 全ステップ完了を隠す</span>
       </label>
@@ -148,17 +148,17 @@
 
     <!-- VIEW: CALENDAR -->
     <section id="view-calendar" class="hidden space-y-4">
-      <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div class="flex items-center space-x-2">
-            <h2 id="calendar-month-year" class="text-base font-bold text-white">--年 --月</h2>
-            <button onclick="changeCalendarMonth(-1)" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i class="fa-solid fa-chevron-left"></i></button>
-            <button onclick="resetCalendarToToday()" class="text-xs px-2 py-0.5 bg-slate-800 text-slate-300 rounded">今日</button>
-            <button onclick="changeCalendarMonth(1)" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i class="fa-solid fa-chevron-right"></i></button>
+            <h2 id="calendar-month-year" class="text-base font-bold text-slate-900">--年 --月</h2>
+            <button onclick="changeCalendarMonth(-1)" class="p-1 hover:bg-slate-100 rounded text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="resetCalendarToToday()" class="text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold">今日</button>
+            <button onclick="changeCalendarMonth(1)" class="p-1 hover:bg-slate-100 rounded text-slate-600"><i class="fa-solid fa-chevron-right"></i></button>
           </div>
 
           <!-- 色の凡例 -->
-          <div class="flex items-center space-x-3 text-[11px] text-slate-300 flex-wrap gap-y-1">
+          <div class="flex items-center space-x-3 text-[11px] text-slate-600 flex-wrap gap-y-1 font-medium">
             <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 mr-1"></span> 講義/その他</span>
             <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600 mr-1"></span> 1回目</span>
             <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-600 mr-1"></span> 2回目</span>
@@ -166,11 +166,11 @@
           </div>
         </div>
 
-        <div class="calendar-grid text-center font-bold text-xs text-slate-500 py-2 border-b border-slate-800">
-          <div class="text-red-400">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-400">土</div>
+        <div class="calendar-grid text-center font-bold text-xs text-slate-400 py-2 border-b border-slate-100">
+          <div class="text-red-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
         </div>
 
-        <div id="calendar-days-grid" class="calendar-grid divide-x divide-y divide-slate-800 border-b border-slate-800">
+        <div id="calendar-days-grid" class="calendar-grid divide-x divide-y divide-slate-100 border-b border-slate-100">
           <!-- JSで描画 -->
         </div>
       </div>
@@ -186,77 +186,77 @@
   </main>
 
   <!-- モーダル: 講義登録 -->
-  <div id="modal-lecture" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-800 shadow-2xl">
-      <h3 class="text-base font-bold text-white mb-4">新規講義サイクルの追加</h3>
+  <div id="modal-lecture" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-4">新規講義サイクルの追加</h3>
       <form id="form-lecture" onsubmit="saveNewLecture(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block text-slate-400 mb-1">講義名・テーマ *</label>
-          <input type="text" id="input-title" required placeholder="例: 財務 リース２" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+          <label class="block text-slate-700 font-semibold mb-1">講義名・テーマ *</label>
+          <input type="text" id="input-title" required placeholder="例: 財務 リース２" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-slate-400 mb-1">科目 / カテゴリ</label>
-            <input type="text" id="input-category" placeholder="例: 会計" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+            <label class="block text-slate-700 font-semibold mb-1">科目 / カテゴリ</label>
+            <input type="text" id="input-category" placeholder="例: 会計" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
-            <label class="block text-slate-400 mb-1">受講日 (A) *</label>
-            <input type="date" id="input-date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+            <label class="block text-slate-700 font-semibold mb-1">受講日 (A) *</label>
+            <input type="date" id="input-date" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
           </div>
         </div>
         <div class="flex justify-end space-x-2 pt-2">
-          <button type="button" onclick="closeModal('modal-lecture')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium">キャンセル</button>
-          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">保存</button>
+          <button type="button" onclick="closeModal('modal-lecture')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm">保存</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- モーダル: 単体タスク追加 -->
-  <div id="modal-other" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-800 shadow-2xl">
-      <h3 class="text-base font-bold text-white mb-4">単体タスクの追加</h3>
+  <div id="modal-other" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-4">単体タスクの追加</h3>
       <form id="form-other" onsubmit="saveNewOtherTask(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block text-slate-400 mb-1">タスク名 *</label>
-          <input type="text" id="input-other-title" required placeholder="例: パソコン補償終了約90日" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+          <label class="block text-slate-700 font-semibold mb-1">タスク名 *</label>
+          <input type="text" id="input-other-title" required placeholder="例: パソコン補償終了約90日" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
         <div>
-          <label class="block text-slate-400 mb-1">予定日 *</label>
-          <input type="date" id="input-other-date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+          <label class="block text-slate-700 font-semibold mb-1">予定日 *</label>
+          <input type="date" id="input-other-date" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
         <div class="flex justify-end space-x-2 pt-2">
-          <button type="button" onclick="closeModal('modal-other')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium">キャンセル</button>
-          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">追加</button>
+          <button type="button" onclick="closeModal('modal-other')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm">追加</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- モーダル: タスク編集・シフト -->
-  <div id="modal-shift" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-800 shadow-2xl">
-      <h3 class="text-base font-bold text-white mb-3">タスクの日付変更</h3>
-      <div id="modal-shift-info" class="bg-slate-800 p-3 rounded-xl mb-4 text-xs text-blue-300"></div>
+  <div id="modal-shift" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-3">タスクの日付変更</h3>
+      <div id="modal-shift-info" class="bg-blue-50 border border-blue-100 p-3 rounded-xl mb-4 text-xs text-blue-900"></div>
       <div class="space-y-4 text-xs">
         <div>
-          <label class="block text-slate-400 mb-2">クイック延期</label>
+          <label class="block text-slate-700 font-semibold mb-2">クイック延期</label>
           <div class="grid grid-cols-4 gap-2">
-            <button onclick="shiftQuickOffset(1)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+1日</button>
-            <button onclick="shiftQuickOffset(2)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+2日</button>
-            <button onclick="shiftQuickOffset(3)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+3日</button>
-            <button onclick="shiftQuickOffset(7)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+7日</button>
+            <button onclick="shiftQuickOffset(1)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg font-bold text-slate-700">+1日</button>
+            <button onclick="shiftQuickOffset(2)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg font-bold text-slate-700">+2日</button>
+            <button onclick="shiftQuickOffset(3)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg font-bold text-slate-700">+3日</button>
+            <button onclick="shiftQuickOffset(7)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg font-bold text-slate-700">+7日</button>
           </div>
         </div>
         <div>
-          <label class="block text-slate-400 mb-1">変更後の日付</label>
-          <input type="date" id="input-shift-date" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+          <label class="block text-slate-700 font-semibold mb-1">変更後の日付</label>
+          <input type="date" id="input-shift-date" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
         <div class="flex justify-between items-center pt-2">
-          <button onclick="deleteCurrentTask()" class="text-red-400 hover:text-red-300 font-medium">削除</button>
+          <button onclick="deleteCurrentTask()" class="text-red-600 hover:text-red-700 font-semibold">削除</button>
           <div class="space-x-2">
-            <button onclick="closeModal('modal-shift')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium">キャンセル</button>
-            <button onclick="saveShiftAction()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">保存</button>
+            <button onclick="closeModal('modal-shift')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium">キャンセル</button>
+            <button onclick="saveShiftAction()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm">保存</button>
           </div>
         </div>
       </div>
@@ -290,10 +290,10 @@
     function updateSyncStatus(isOnline) {
       const badge = document.getElementById('sync-status-badge');
       if (isOnline) {
-        badge.className = "text-[11px] text-emerald-400 font-semibold flex items-center mt-0.5";
+        badge.className = "text-[11px] text-emerald-600 font-semibold flex items-center mt-0.5";
         badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1"></span> クラウド自動同期中`;
       } else {
-        badge.className = "text-[11px] text-amber-400 font-semibold flex items-center mt-0.5";
+        badge.className = "text-[11px] text-amber-600 font-semibold flex items-center mt-0.5";
         badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 mr-1"></span> ローカル保存中`;
       }
     }
@@ -388,10 +388,10 @@
 
     /* タイプ別のカラー取得関数 */
     function getTaskColorClass(blockKey) {
-      if (blockKey === 'B') return 'bg-emerald-600 hover:bg-emerald-500';
-      if (blockKey === 'C') return 'bg-amber-600 hover:bg-amber-500';
-      if (blockKey === 'D') return 'bg-purple-600 hover:bg-purple-500';
-      return 'bg-blue-600 hover:bg-blue-500'; // A(講義) および その他
+      if (blockKey === 'B') return 'bg-emerald-600 hover:bg-emerald-700';
+      if (blockKey === 'C') return 'bg-amber-600 hover:bg-amber-700';
+      if (blockKey === 'D') return 'bg-purple-600 hover:bg-purple-700';
+      return 'bg-blue-600 hover:bg-blue-700'; // A(講義) および その他
     }
 
     function switchTab(tab) {
@@ -402,10 +402,10 @@
         const btn = document.getElementById(`tab-${t}`);
         const view = document.getElementById(`view-${t}`);
         if (t === tab) {
-          btn.className = "px-4 py-2 rounded-lg bg-blue-600 text-white shadow font-semibold";
+          btn.className = "px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm font-semibold";
           view.classList.remove('hidden');
         } else {
-          btn.className = "px-4 py-2 rounded-lg text-slate-400 hover:text-white font-semibold";
+          btn.className = "px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 font-semibold";
           view.classList.add('hidden');
         }
       });
@@ -484,7 +484,7 @@
       const sortedDates = Object.keys(grouped).sort();
 
       if (sortedDates.length === 0) {
-        container.innerHTML = `<div class="text-center text-slate-500 py-10">表示できるタスクはありません</div>`;
+        container.innerHTML = `<div class="text-center text-slate-400 py-10 font-medium">表示できるタスクはありません</div>`;
         return;
       }
 
@@ -497,12 +497,12 @@
 
         groupEl.innerHTML = `
           <div class="flex justify-between items-center px-1">
-            <h3 class="text-lg font-bold text-slate-100 flex items-center">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center">
               ${headerTitle}
-              ${isToday ? '<span class="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">今日</span>' : ''}
+              ${isToday ? '<span class="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">今日</span>' : ''}
             </h3>
             ${isToday ? `
-              <button onclick="openNewOtherModal()" class="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-400 text-white flex items-center justify-center font-bold shadow">
+              <button onclick="openNewOtherModal()" class="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center font-bold shadow-sm transition">
                 <i class="fa-solid fa-plus"></i>
               </button>
             ` : ''}
@@ -533,21 +533,21 @@
 
           const card = document.createElement('div');
           card.draggable = true;
-          card.className = `task-card ${colorClass} text-white font-semibold px-4 py-3 rounded-full flex items-center justify-between shadow ${
-            task.completed ? 'opacity-40 bg-slate-800 text-slate-400' : ''
+          card.className = `task-card ${colorClass} text-white font-semibold px-4 py-3 rounded-full flex items-center justify-between shadow-sm transition ${
+            task.completed ? 'opacity-40 bg-slate-400 text-slate-100' : ''
           }`;
 
           card.innerHTML = `
             <div class="flex items-center space-x-3 truncate flex-1 cursor-pointer" onclick="toggleTaskStatus('${task.type}', '${task.id}', '${task.blockKey}')">
-              <div class="w-5 h-5 rounded-full border-2 border-white/80 flex items-center justify-center text-xs flex-shrink-0 ${task.completed ? 'bg-white text-slate-900 border-white' : ''}">
+              <div class="w-5 h-5 rounded-full border-2 border-white/80 flex items-center justify-center text-xs flex-shrink-0 ${task.completed ? 'bg-white text-slate-800 border-white' : ''}">
                 ${task.completed ? '<i class="fa-solid fa-check"></i>' : ''}
               </div>
               <span class="truncate text-sm tracking-wide">
-                ${task.category ? `<span class="opacity-80 font-normal mr-2">${escapeHTML(task.category)}</span>` : ''}
+                ${task.category ? `<span class="opacity-90 font-normal mr-2">${escapeHTML(task.category)}</span>` : ''}
                 ${escapeHTML(task.title)}
               </span>
             </div>
-            <button onclick="event.stopPropagation(); openShiftModal('${task.type}', '${task.id}', '${task.blockKey}')" class="text-white/70 hover:text-white p-1 ml-2">
+            <button onclick="event.stopPropagation(); openShiftModal('${task.type}', '${task.id}', '${task.blockKey}')" class="text-white/80 hover:text-white p-1 ml-2">
               <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
             </button>
           `;
@@ -619,7 +619,7 @@
 
       for (let i = 0; i < firstDay; i++) {
         const cell = document.createElement('div');
-        cell.className = 'min-h-[80px] p-1 bg-slate-900/40 text-slate-700 text-xs';
+        cell.className = 'min-h-[80px] p-1 bg-slate-50/50 text-slate-300 text-xs';
         grid.appendChild(cell);
       }
 
@@ -629,7 +629,7 @@
         const tasks = calendarMap[dateStr] || [];
 
         const cell = document.createElement('div');
-        cell.className = `min-h-[80px] p-1 border-t border-slate-800 transition drop-zone ${isToday ? 'bg-blue-900/20' : ''}`;
+        cell.className = `min-h-[80px] p-1 border-t border-slate-100 transition drop-zone ${isToday ? 'bg-blue-50/40' : ''}`;
         cell.setAttribute('data-date', dateStr);
 
         cell.addEventListener('dragover', (e) => { e.preventDefault(); cell.classList.add('drag-over'); });
@@ -643,7 +643,7 @@
         let badgesHTML = tasks.map(t => {
           const colorClass = getTaskColorClass(t.key);
           return `
-            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white ${colorClass} mb-1 cursor-pointer ${t.completed ? 'opacity-40 line-through' : ''}">
+            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white ${colorClass} mb-1 cursor-pointer font-medium ${t.completed ? 'opacity-40 line-through' : ''}">
               ${escapeHTML(t.title)}
             </div>
           `;
@@ -651,7 +651,7 @@
 
         cell.innerHTML = `
           <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-400'}">${day}</span>
+            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-700'}">${day}</span>
           </div>
           <div class="space-y-0.5 max-h-14 overflow-y-auto">${badgesHTML}</div>
         `;
@@ -675,7 +675,7 @@
       container.innerHTML = '';
 
       if (appData.lectures.length === 0) {
-        container.innerHTML = '<p class="col-span-full text-center text-slate-500 py-8">登録された講義サイクルがありません。</p>';
+        container.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8 font-medium">登録された講義サイクルがありません。</p>';
         return;
       }
 
@@ -690,23 +690,23 @@
       }
 
       if (displayedLectures.length === 0) {
-        container.innerHTML = '<p class="col-span-full text-center text-slate-500 py-8">表示できる講義はありません（すべて完了済み）</p>';
+        container.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8 font-medium">表示できる講義はありません（すべて完了済み）</p>';
         return;
       }
 
       displayedLectures.forEach(lec => {
         const card = document.createElement('div');
-        card.className = 'bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3';
+        card.className = 'bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm';
 
         let blocksHTML = ['A', 'B', 'C', 'D'].map(k => {
           const b = lec.blocks[k];
           if (!b) return '';
           return `
-            <div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-800 last:border-0">
-              <span class="text-slate-300 font-medium">${b.label}: ${formatDateHeader(b.date)}</span>
+            <div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-0">
+              <span class="text-slate-700 font-medium">${b.label}: ${formatDateHeader(b.date)}</span>
               <div class="flex items-center space-x-2">
-                ${b.completed ? '<span class="text-emerald-400 font-bold">完了</span>' : '<span class="text-slate-500">未処理</span>'}
-                <button onclick="openShiftModal('cycle', '${lec.id}', '${k}')" class="text-blue-400 hover:underline">変更</button>
+                ${b.completed ? '<span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-0.5"></i>完了</span>' : '<span class="text-slate-400">未処理</span>'}
+                <button onclick="openShiftModal('cycle', '${lec.id}', '${k}')" class="text-blue-600 hover:underline">変更</button>
               </div>
             </div>
           `;
@@ -715,12 +715,12 @@
         card.innerHTML = `
           <div class="flex justify-between items-start">
             <div>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 font-bold inline-block mb-1">${escapeHTML(lec.category)}</span>
-              <h3 class="font-bold text-white text-sm">${escapeHTML(lec.title)}</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold inline-block mb-1">${escapeHTML(lec.category)}</span>
+              <h3 class="font-bold text-slate-900 text-sm">${escapeHTML(lec.title)}</h3>
             </div>
-            <button onclick="deleteLectureCycle('${lec.id}')" class="text-slate-600 hover:text-red-400 p-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            <button onclick="deleteLectureCycle('${lec.id}')" class="text-slate-300 hover:text-red-500 p-1 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
           </div>
-          <div class="bg-slate-800/50 rounded-xl p-2.5 space-y-1">${blocksHTML}</div>
+          <div class="bg-slate-50 rounded-xl p-2.5 space-y-1">${blocksHTML}</div>
         `;
         container.appendChild(card);
       });
@@ -792,8 +792,8 @@
         activeShiftContext.oldDate = b.date;
 
         document.getElementById('modal-shift-info').innerHTML = `
-          <div class="font-bold text-white">${escapeHTML(lec.title)}</div>
-          <div class="text-xs text-blue-300 mt-1">現在: ${formatDateHeader(b.date)}</div>
+          <div class="font-bold text-slate-900">${escapeHTML(lec.title)}</div>
+          <div class="text-xs text-blue-800 mt-1">現在: ${formatDateHeader(b.date)}</div>
         `;
         document.getElementById('input-shift-date').value = b.date;
       } else {
@@ -802,8 +802,8 @@
         activeShiftContext.oldDate = st.date;
 
         document.getElementById('modal-shift-info').innerHTML = `
-          <div class="font-bold text-white">${escapeHTML(st.title)}</div>
-          <div class="text-xs text-blue-300 mt-1">現在: ${formatDateHeader(st.date)}</div>
+          <div class="font-bold text-slate-900">${escapeHTML(st.title)}</div>
+          <div class="text-xs text-blue-800 mt-1">現在: ${formatDateHeader(st.date)}</div>
         `;
         document.getElementById('input-shift-date').value = st.date;
       }
