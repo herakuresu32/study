@@ -3,10 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>復習・学習スケジュール管理（安定同期版）</title>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <title>復習・学習スケジュール管理（安全保存版）</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: #f0f2f5; margin: 0; padding: 12px; color: #333; }
@@ -15,6 +12,7 @@
     h3 { margin-top: 0; color: #1a73e8; }
     .sync-bar { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 10px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.9rem; flex-wrap: wrap; gap: 8px; }
     .btn { background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .btn-success { background: #34a853; }
     .btn-danger { background: #d93025; }
     .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
     input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; margin-right: 8px; margin-bottom: 8px; }
@@ -45,13 +43,15 @@
 
 <div class="container">
 
-  <!-- 同期設定バー -->
+  <!-- 同期・バックアップバー -->
   <div class="sync-bar">
     <div>
-      🔑 共通あい言葉（同期ID）: <strong id="current-group-id" style="color:#1a73e8;">未設定</strong>
-      <span id="sync-status" style="font-weight:bold; margin-left:12px;">● 接続確認中</span>
+      💾 データ保存状態: <strong style="color:#34a853;">端末内に安全保存中</strong>
     </div>
-    <button class="btn btn-sm" onclick="changeGroupId()">あい言葉を変更</button>
+    <div>
+      <button class="btn btn-sm btn-success" onclick="exportData()">📤 同期データをコピー</button>
+      <button class="btn btn-sm" onclick="importData()">📥 同期データを読み込み</button>
+    </div>
   </div>
 
   <!-- タスク追加フォーム -->
@@ -87,60 +87,60 @@
 </div>
 
 <script>
-  // Firebase設定（リアルタイムデータベース）
-  const firebaseConfig = {
-    databaseURL: "https://study-sync-default-rtdb.asia-southeast1.firebasedatabase.app/"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-
-  // デフォルトの共通あい言葉（初期設定）
-  let groupId = localStorage.getItem('study_group_id_fixed') || 'my-study-group-2026';
-  localStorage.setItem('study_group_id_fixed', groupId);
-  document.getElementById('current-group-id').innerText = groupId;
-
   let tasks = [];
   let currentDate = new Date();
-  let dbRef = null;
 
-  // 今日の日付を初期セット
   document.getElementById('task-date').valueAsDate = new Date();
 
-  function changeGroupId() {
-    const input = prompt("PCとスマホで同じ「あい言葉（半角英数字）」を入力してください:", groupId);
-    if (input && input.trim() !== "") {
-      groupId = input.trim();
-      localStorage.setItem('study_group_id_fixed', groupId);
-      document.getElementById('current-group-id').innerText = groupId;
-      initSync();
+  // ローカルストレージからデータ読み込み
+  function loadLocalData() {
+    const saved = localStorage.getItem('study_tasks_data_safe');
+    if (saved) {
+      try {
+        tasks = JSON.parse(saved);
+      } catch(e) {
+        tasks = [];
+      }
     }
+    render();
   }
 
-  function initSync() {
-    document.getElementById('sync-status').innerText = '⏳ 接続中...';
-    document.getElementById('sync-status').style.color = '#fbbc05';
+  // ローカルストレージに保存
+  function saveLocalData() {
+    localStorage.setItem('study_tasks_data_safe', JSON.stringify(tasks));
+    render();
+  }
 
-    // 以前のリスナー解除
-    if (dbRef) dbRef.off();
-
-    dbRef = db.ref('groups/' + groupId);
-
-    // クラウドからデータを受信
-    dbRef.on('value', (snapshot) => {
-      const data = snapshot.val();
-      tasks = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      document.getElementById('sync-status').innerText = '● 同期完了';
-      document.getElementById('sync-status').style.color = '#34a853';
-      render();
-    }, (error) => {
-      document.getElementById('sync-status').innerText = '✖ 通信エラー';
-      document.getElementById('sync-status').style.color = '#d93025';
+  // データ書き出し（クリップボードコピー）
+  function exportData() {
+    if (tasks.length === 0) {
+      alert("共有するタスクデータがありません。");
+      return;
+    }
+    const jsonStr = JSON.stringify(tasks);
+    navigator.clipboard.writeText(jsonStr).then(() => {
+      alert("同期用データコードをコピーしました！\nこのコードをLINEやメール等でスマホ/PCに送り、「同期データを読み込み」ボタンで貼り付けてください。");
+    }).catch(() => {
+      prompt("以下のコードを全選択してコピーしてください:", jsonStr);
     });
   }
 
-  function saveData() {
-    if (dbRef) {
-      dbRef.set(tasks);
+  // データ読み込み
+  function importData() {
+    const input = prompt("共有された同期データコード（テキスト）を貼り付けてください:");
+    if (input && input.trim() !== "") {
+      try {
+        const imported = JSON.parse(input.trim());
+        if (Array.isArray(imported)) {
+          tasks = imported;
+          saveLocalData();
+          alert("データの同期・取り込みが完了しました！");
+        } else {
+          alert("データ形式が正しくありません。");
+        }
+      } catch(e) {
+        alert("データの読み込みに失敗しました。正しくコードが貼り付けられているかご確認ください。");
+      }
     }
   }
 
@@ -151,7 +151,7 @@
     const dateStr = document.getElementById('task-date').value;
 
     if (!title || !dateStr) {
-      alert("タイトルと開始日付を入力してください。");
+      alert("タイトルと日付を入力してください。");
       return;
     }
 
@@ -160,14 +160,13 @@
 
     if (type === 'single') {
       tasks.push({
-        id: 't-' + Date.now() + '-' + Math.floor(Math.random()*1000),
+        id: 't-' + Date.now(),
         title: title,
         date: dateStr,
         stage: 'single',
         done: false
       });
     } else {
-      // サイクル (A: 1日目, B: 2日目[+1d], C: 5日目[+4d], D: 14日目[+13d])
       const offsets = [
         { stage: 'A', offset: 0, label: '【講義】' },
         { stage: 'B', offset: 1, label: '【復習1】' },
@@ -189,20 +188,18 @@
       });
     }
 
-    saveData();
+    saveLocalData();
     document.getElementById('task-title').value = '';
   }
 
-  // 完了トグル
   function toggleDone(id) {
     const t = tasks.find(x => x.id === id);
     if (t) {
       t.done = !t.done;
-      saveData();
+      saveLocalData();
     }
   }
 
-  // 日付連動シフト
   function shiftTask(id, days) {
     const target = tasks.find(x => x.id === id);
     if (!target) return;
@@ -226,13 +223,13 @@
       });
     }
 
-    saveData();
+    saveLocalData();
   }
 
   function deleteTask(id) {
     if (confirm("このタスクを削除しますか？")) {
       tasks = tasks.filter(x => x.id !== id);
-      saveData();
+      saveLocalData();
     }
   }
 
@@ -248,7 +245,7 @@
     const sorted = [...tasks].sort((a, b) => a.date.localeCompare(b.date));
 
     if (sorted.length === 0) {
-      listEl.innerHTML = '<p style="color:#888; padding:8px;">登録されているタスクはありません。</p>';
+      listEl.innerHTML = '<p style="color:#888; padding:8px;">タスクはありません。</p>';
       return;
     }
 
@@ -329,8 +326,8 @@
     }
   }
 
-  // 初回接続開始
-  initSync();
+  // 初期読み込み
+  loadLocalData();
 </script>
 
 </body>
