@@ -13,10 +13,12 @@
       theme: {
         extend: {
           colors: {
-            typeA: '#2563eb', // A: 講義 / その他
-            typeB: '#059669', // B: 1回目
-            typeC: '#d97706', // C: 2回目
-            typeD: '#7c3aed', // D: 3回目
+            typeA: '#2563eb',
+            typeB: '#059669',
+            typeC: '#d97706',
+            typeD: '#7c3aed',
+            appDark: '#1e293b',
+            cardBlue: '#3b82f6',
           }
         }
       }
@@ -24,8 +26,11 @@
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
     .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .task-card { cursor: grab; user-select: none; transition: transform 0.15s, opacity 0.15s; }
+    .task-card:active { cursor: grabbing; opacity: 0.7; }
+    .drag-over { background-color: rgba(59, 130, 246, 0.2) !important; border-style: dashed !important; }
   </style>
 
   <!-- Firebase (クラウド同期用SDK) -->
@@ -33,7 +38,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 💡 あなたのFirebaseプロジェクト（study-f5782）の設定を適用済みです
     const firebaseConfig = {
       apiKey: "AIzaSyDEJn3BPHLWjdKDS5cTeNIb5co4Fizuc4c",
       authDomain: "study-f5782.firebaseapp.com",
@@ -44,15 +48,11 @@
       measurementId: "G-KMN0MVL4QE"
     };
 
-    // Firebaseの初期化
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
-    // 全端末で共通利用するドキュメント参照
     const docRef = doc(db, "study_schedules", "shared_user_schedule");
 
     window.FirebaseDB = {
-      // クラウドデータのリアルタイム受信登録
       subscribe: (callback) => {
         return onSnapshot(docRef, (snapshot) => {
           if (snapshot.exists()) {
@@ -61,11 +61,10 @@
             callback(null);
           }
         }, (error) => {
-          console.warn("クラウド接続に失敗しました。ローカルストレージに切り替えます。", error);
+          console.warn("クラウド接続エラー:", error);
           window.updateSyncStatus(false);
         });
       },
-      // クラウドへデータの保存
       save: async (data) => {
         try {
           await setDoc(docRef, data);
@@ -78,113 +77,81 @@
     };
   </script>
 </head>
-<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+<body class="antialiased min-h-screen flex flex-col">
 
   <!-- ヘッダー -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16 items-center">
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
-            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
-          </div>
-          <div>
-            <h1 class="font-bold text-lg leading-tight text-slate-900">忘却曲線 復習マネージャー</h1>
-            <div class="flex items-center space-x-2 text-xs text-slate-500">
-              <span id="sync-status-badge" class="inline-flex items-center text-emerald-600 font-semibold">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1.5"></span> クラウド自動同期中
-              </span>
-            </div>
-          </div>
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow">
+          <i class="fa-solid fa-cloud"></i>
         </div>
+        <div>
+          <h1 class="font-bold text-base text-white leading-tight">復習マネージャー</h1>
+          <span id="sync-status-badge" class="text-[11px] text-emerald-400 font-semibold flex items-center mt-0.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1"></span> 同期中
+          </span>
+        </div>
+      </div>
 
-        <div class="flex items-center space-x-2">
-          <button onclick="openNewOtherModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center transition">
-            <i class="fa-solid fa-plus mr-1.5 text-blue-600"></i> その他(単体)
-          </button>
-          <button onclick="openNewLectureModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center transition shadow-sm">
-            <i class="fa-solid fa-layer-group mr-1.5"></i> 講義サイクル追加
-          </button>
-        </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="openNewOtherModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition">
+          <i class="fa-solid fa-plus mr-1 text-blue-400"></i> タスク
+        </button>
+        <button onclick="openNewLectureModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-full font-medium text-xs flex items-center transition shadow">
+          <i class="fa-solid fa-layer-group mr-1"></i> 講義サイクル
+        </button>
       </div>
     </div>
   </header>
 
   <!-- メインコンテンツ -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-5">
 
-    <!-- 検索・絞り込み ＆ 改善点コントロール -->
-    <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center space-x-2 flex-1 min-w-[240px]">
-        <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm ml-2"></i>
-        <input type="text" id="search-keyword" oninput="renderCurrentView()" placeholder="タスク・科目名で検索..." class="w-full text-sm border-none focus:outline-none bg-transparent">
+    <!-- ビュー切り替え ＆ コントロール -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div class="flex bg-slate-800 p-1 rounded-xl text-xs font-semibold">
+        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg bg-blue-600 text-white shadow">
+          <i class="fa-solid fa-list-check mr-1.5"></i>ToDoリスト
+        </button>
+        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white">
+          <i class="fa-regular fa-calendar-days mr-1.5"></i>カレンダー
+        </button>
+        <button id="tab-lectures" onclick="switchTab('lectures')" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white">
+          <i class="fa-solid fa-book-bookmark mr-1.5"></i>講義一覧
+        </button>
       </div>
-      <div class="flex items-center space-x-3 text-sm">
-        <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-          <input type="checkbox" id="hide-completed-toggle" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-blue-500">
-          <span class="text-xs font-semibold text-slate-700">完了タスクを隠す</span>
-        </label>
-      </div>
+
+      <label class="flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+        <input type="checkbox" id="hide-completed-toggle" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-0">
+        <span>完了を隠す</span>
+      </label>
     </div>
 
-    <!-- ビュー切り替えタブ -->
-    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-      <div class="flex bg-slate-200/80 p-1 rounded-xl text-sm font-medium">
-        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg transition flex items-center space-x-2 bg-white text-slate-900 shadow-sm">
-          <i class="fa-solid fa-list-check text-blue-600"></i>
-          <span>ToDoリスト</span>
-          <span id="todo-badge" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-bold">0</span>
-        </button>
-        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg transition flex items-center space-x-2 text-slate-600 hover:text-slate-900">
-          <i class="fa-regular fa-calendar-days text-slate-500"></i>
-          <span>カレンダー</span>
-        </button>
-        <button id="tab-lectures" onclick="switchTab('lectures')" class="px-4 py-2 rounded-lg transition flex items-center space-x-2 text-slate-600 hover:text-slate-900">
-          <i class="fa-solid fa-book-bookmark text-slate-500"></i>
-          <span>講義管理</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- VIEW: TODO LIST -->
-    <section id="view-todo" class="space-y-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-base font-bold text-slate-900 flex items-center">
-          <i class="fa-solid fa-clock-rotate-left text-blue-600 mr-2"></i> 本日・今後のタスク
-        </h2>
-        <span class="text-xs text-slate-500" id="todo-summary">--</span>
-      </div>
-
-      <div id="todo-list-container" class="space-y-3">
-        <!-- JSで描画 -->
+    <!-- VIEW: TODO LIST (画像イメージ風UI) -->
+    <section id="view-todo" class="space-y-6">
+      <div id="todo-groups-container" class="space-y-6">
+        <!-- JSで日付ごとにグループ化描画 -->
       </div>
     </section>
 
     <!-- VIEW: CALENDAR -->
     <section id="view-calendar" class="hidden space-y-4">
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <div class="flex items-center space-x-3">
-            <h2 id="calendar-month-year" class="text-lg font-bold text-slate-900">--年 --月</h2>
-            <button onclick="changeCalendarMonth(-1)" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>
-            <button onclick="resetCalendarToToday()" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold">今日</button>
-            <button onclick="changeCalendarMonth(1)" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"><i class="fa-solid fa-chevron-right"></i></button>
-          </div>
-
-          <!-- カラー凡例 -->
-          <div class="flex items-center space-x-3 text-xs flex-wrap gap-y-1">
-            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-600 mr-1"></span> A:講義 / その他</span>
-            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-600 mr-1"></span> B:1回目(1日後)</span>
-            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-600 mr-1"></span> C:2回目(4日後)</span>
-            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-purple-600 mr-1"></span> D:3回目(13日後)</span>
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <h2 id="calendar-month-year" class="text-base font-bold text-white">--年 --月</h2>
+            <button onclick="changeCalendarMonth(-1)" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="resetCalendarToToday()" class="text-xs px-2 py-0.5 bg-slate-800 text-slate-300 rounded">今日</button>
+            <button onclick="changeCalendarMonth(1)" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i class="fa-solid fa-chevron-right"></i></button>
           </div>
         </div>
 
-        <div class="calendar-grid text-center font-bold text-xs text-slate-400 py-2 border-b border-slate-100">
-          <div class="text-red-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
+        <div class="calendar-grid text-center font-bold text-xs text-slate-500 py-2 border-b border-slate-800">
+          <div class="text-red-400">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-400">土</div>
         </div>
 
-        <div id="calendar-days-grid" class="calendar-grid divide-x divide-y divide-slate-100 border-b border-slate-100">
+        <div id="calendar-days-grid" class="calendar-grid divide-x divide-y divide-slate-800 border-b border-slate-800">
           <!-- JSで描画 -->
         </div>
       </div>
@@ -199,109 +166,79 @@
 
   </main>
 
-  <!-- Modal: 新規講義サイクル -->
-  <div id="modal-lecture" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-900">新規講義サイクルの登録</h3>
-        <button onclick="closeModal('modal-lecture')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-
-      <form id="form-lecture" onsubmit="saveNewLecture(event)" class="space-y-4">
+  <!-- モーダル: 講義登録 -->
+  <div id="modal-lecture" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-800 shadow-2xl">
+      <h3 class="text-base font-bold text-white mb-4">新規講義サイクルの追加</h3>
+      <form id="form-lecture" onsubmit="saveNewLecture(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">講義名・テーマ <span class="text-red-500">*</span></label>
-          <input type="text" id="input-title" required placeholder="例: 財務会計論 第3講" class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label class="block text-slate-400 mb-1">講義名・テーマ *</label>
+          <input type="text" id="input-title" required placeholder="例: 財務 リース２" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
         </div>
-
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">科目 / カテゴリ</label>
-            <input type="text" id="input-category" placeholder="例: 会計学, 企業法" class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <label class="block text-slate-400 mb-1">科目 / カテゴリ</label>
+            <input type="text" id="input-category" placeholder="例: 会計" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">講義受講日 (A) <span class="text-red-500">*</span></label>
-            <input type="date" id="input-date" required class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <label class="block text-slate-400 mb-1">受講日 (A) *</label>
+            <input type="date" id="input-date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
           </div>
         </div>
-
-        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
-          <div class="font-bold text-slate-700 mb-1">自動生成サイクル:</div>
-          <div class="flex items-center text-blue-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 mr-2"></span>【A】講義受講 (当日)</div>
-          <div class="flex items-center text-emerald-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600 mr-2"></span>【B】1回目復習 (+1日後)</div>
-          <div class="flex items-center text-amber-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-amber-600 mr-2"></span>【C】2回目復習 (+4日後)</div>
-          <div class="flex items-center text-purple-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-purple-600 mr-2"></span>【D】3回目復習 (+13日後)</div>
-        </div>
-
-        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modal-lecture')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
-          <button type="submit" class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm">クラウドに保存</button>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('modal-lecture')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">保存</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal: 単体タスク (その他) -->
-  <div id="modal-other" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-900">単体タスクの追加 (その他)</h3>
-        <button onclick="closeModal('modal-other')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-
-      <form id="form-other" onsubmit="saveNewOtherTask(event)" class="space-y-4">
+  <!-- モーダル: 単体タスク追加 -->
+  <div id="modal-other" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-800 shadow-2xl">
+      <h3 class="text-base font-bold text-white mb-4">単体タスクの追加</h3>
+      <form id="form-other" onsubmit="saveNewOtherTask(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">タスク名 <span class="text-red-500">*</span></label>
-          <input type="text" id="input-other-title" required placeholder="例: 答練の復習・解き直し" class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label class="block text-slate-400 mb-1">タスク名 *</label>
+          <input type="text" id="input-other-title" required placeholder="例: パソコン補償終了約90日" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
         </div>
-
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">予定日 <span class="text-red-500">*</span></label>
-          <input type="date" id="input-other-date" required class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label class="block text-slate-400 mb-1">予定日 *</label>
+          <input type="date" id="input-other-date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
         </div>
-
-        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modal-other')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
-          <button type="submit" class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm">追加する</button>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('modal-other')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">追加</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal: 日程調整・シフト -->
-  <div id="modal-shift" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-900">日程ズラし・連動調整</h3>
-        <button onclick="closeModal('modal-shift')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-
-      <div id="modal-shift-info" class="bg-blue-50 border border-blue-100 p-3.5 rounded-xl mb-4 text-sm text-blue-900">
-        <!-- JSで描画 -->
-      </div>
-
-      <div class="space-y-4">
+  <!-- モーダル: タスク編集・シフト -->
+  <div id="modal-shift" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-800 shadow-2xl">
+      <h3 class="text-base font-bold text-white mb-3">タスクの日付変更</h3>
+      <div id="modal-shift-info" class="bg-slate-800 p-3 rounded-xl mb-4 text-xs text-blue-300"></div>
+      <div class="space-y-4 text-xs">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-2">クイック調整</label>
+          <label class="block text-slate-400 mb-2">クイック延期</label>
           <div class="grid grid-cols-4 gap-2">
-            <button onclick="shiftQuickOffset(1)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+1日</button>
-            <button onclick="shiftQuickOffset(2)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+2日</button>
-            <button onclick="shiftQuickOffset(3)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+3日</button>
-            <button onclick="shiftQuickOffset(7)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+7日</button>
+            <button onclick="shiftQuickOffset(1)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+1日</button>
+            <button onclick="shiftQuickOffset(2)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+2日</button>
+            <button onclick="shiftQuickOffset(3)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+3日</button>
+            <button onclick="shiftQuickOffset(7)" class="py-2 bg-slate-800 hover:bg-blue-600 text-white rounded-lg font-bold">+7日</button>
           </div>
         </div>
-
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">変更後の日付を指定</label>
-          <input type="date" id="input-shift-date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <label class="block text-slate-400 mb-1">変更後の日付</label>
+          <input type="date" id="input-shift-date" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
         </div>
-
-        <div id="shift-cascade-warning" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-          <i class="fa-solid fa-arrows-split-up-and-left mr-1"></i> <strong>連動シフト:</strong> 未完了のこれ以降のステップも同じ日数分スライドします。
-        </div>
-
-        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button onclick="closeModal('modal-shift')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
-          <button onclick="saveShiftAction()" class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm">変更を保存</button>
+        <div class="flex justify-between items-center pt-2">
+          <button onclick="deleteCurrentTask()" class="text-red-400 hover:text-red-300 font-medium">削除</button>
+          <div class="space-x-2">
+            <button onclick="closeModal('modal-shift')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium">キャンセル</button>
+            <button onclick="saveShiftAction()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">保存</button>
+          </div>
         </div>
       </div>
     </div>
@@ -309,30 +246,22 @@
 
   <script>
     const LOCAL_STORAGE_KEY = 'forgetting_curve_hybrid_v1';
-
-    let appData = {
-      lectures: [],
-      otherTasks: []
-    };
-
+    let appData = { lectures: [], otherTasks: [] };
     let calendarCurrentDate = new Date();
     let currentViewTab = 'todo';
     let activeShiftContext = { type: 'cycle', id: null, key: null, oldDate: null };
+    let draggedTask = null;
 
     window.addEventListener('DOMContentLoaded', () => {
-      // ローカルデータ読み込み（フォールバック用）
       loadLocalData();
-      
-      // Firebase クラウド同期の設定
       if (window.FirebaseDB) {
         window.FirebaseDB.subscribe((cloudData) => {
           if (cloudData) {
             appData = cloudData;
-            saveLocalData(false); // ローカルにもキャッシュ
+            saveLocalData(false);
             renderCurrentView();
             window.updateSyncStatus(true);
           } else {
-            // 初回クラウド保存
             syncDataToCloud();
           }
         });
@@ -342,39 +271,31 @@
     function updateSyncStatus(isOnline) {
       const badge = document.getElementById('sync-status-badge');
       if (isOnline) {
-        badge.className = "inline-flex items-center text-emerald-600 font-semibold";
-        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1.5"></span> クラウド自動同期中`;
+        badge.className = "text-[11px] text-emerald-400 font-semibold flex items-center mt-0.5";
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1"></span> クラウド自動同期中`;
       } else {
-        badge.className = "inline-flex items-center text-amber-600 font-semibold";
-        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span> 端末内ローカル保存中`;
+        badge.className = "text-[11px] text-amber-400 font-semibold flex items-center mt-0.5";
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 mr-1"></span> ローカル保存中`;
       }
     }
 
     function loadLocalData() {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
-        try {
-          appData = JSON.parse(stored);
-        } catch (e) {
-          console.error(e);
-        }
+        try { appData = JSON.parse(stored); } catch (e) { console.error(e); }
       }
     }
 
     function saveLocalData(triggerCloud = true) {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appData));
-      if (triggerCloud) {
-        syncDataToCloud();
-      }
+      if (triggerCloud) syncDataToCloud();
     }
 
     function syncDataToCloud() {
-      if (window.FirebaseDB) {
-        window.FirebaseDB.save(appData);
-      }
+      if (window.FirebaseDB) window.FirebaseDB.save(appData);
     }
 
-    /* Date Utilities */
+    /* 日付関連ユーティリティ */
     function formatDateISO(d) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -394,14 +315,17 @@
     }
 
     function dateDiff(dateStr1, dateStr2) {
-      const d1 = parseDate(dateStr1);
-      const d2 = parseDate(dateStr2);
-      return Math.round((d2 - d1) / (1000 * 3600 * 24));
+      return Math.round((parseDate(dateStr2) - parseDate(dateStr1)) / (1000 * 3600 * 24));
     }
 
-    function formatDateJP(dateStr) {
+    function formatDateHeader(dateStr) {
       const d = parseDate(dateStr);
       const days = ['日', '月', '火', '水', '木', '金', '土'];
+      const todayStr = formatDateISO(new Date());
+      
+      if (dateStr === todayStr) {
+        return `${d.getDate()}日(${days[d.getDay()]})`;
+      }
       return `${d.getMonth() + 1}月${d.getDate()}日(${days[d.getDay()]})`;
     }
 
@@ -409,29 +333,26 @@
       return 'id_' + Math.random().toString(36).substr(2, 9);
     }
 
-    /* Cycle Factory */
     function createLectureCycle(title, category, startDateStr) {
       return {
         id: generateId(),
         title: title,
         category: category || "講義",
         blocks: {
-          A: { key: 'A', label: '【A】講義受講', date: startDateStr, completed: false },
-          B: { key: 'B', label: '【B】1回目復習', date: addDays(startDateStr, 1), completed: false },
-          C: { key: 'C', label: '【C】2回目復習', date: addDays(startDateStr, 4), completed: false },
-          D: { key: 'D', label: '【D】3回目復習', date: addDays(startDateStr, 13), completed: false }
+          A: { key: 'A', label: '【A】受講', date: startDateStr, completed: false },
+          B: { key: 'B', label: '【B】1回目', date: addDays(startDateStr, 1), completed: false },
+          C: { key: 'C', label: '【C】2回目', date: addDays(startDateStr, 4), completed: false },
+          D: { key: 'D', label: '【D】3回目', date: addDays(startDateStr, 13), completed: false }
         }
       };
     }
 
-    /* 追従スライドエンジン */
     function shiftCycleBlockDate(lectureId, blockKey, newDateStr) {
       const lec = appData.lectures.find(l => l.id === lectureId);
       if (!lec) return;
 
       const targetBlock = lec.blocks[blockKey];
       const diff = dateDiff(targetBlock.date, newDateStr);
-
       if (diff === 0) return;
 
       const keys = ['A', 'B', 'C', 'D'];
@@ -443,7 +364,6 @@
           lec.blocks[k].date = addDays(lec.blocks[k].date, diff);
         }
       }
-
       saveLocalData();
     }
 
@@ -453,16 +373,13 @@
         const btn = document.getElementById(`tab-${t}`);
         const view = document.getElementById(`view-${t}`);
         if (t === tab) {
-          btn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
-          btn.classList.remove('text-slate-600');
+          btn.className = "px-4 py-2 rounded-lg bg-blue-600 text-white shadow font-semibold";
           view.classList.remove('hidden');
         } else {
-          btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
-          btn.classList.add('text-slate-600');
+          btn.className = "px-4 py-2 rounded-lg text-slate-400 hover:text-white font-semibold";
           view.classList.add('hidden');
         }
       });
-
       renderCurrentView();
     }
 
@@ -472,28 +389,26 @@
       if (currentViewTab === 'lectures') renderLecturesView();
     }
 
+    /* VIEW: TODO (画像のようなデザイン) */
     function renderToDoView() {
-      const container = document.getElementById('todo-list-container');
+      const container = document.getElementById('todo-groups-container');
       const hideCompleted = document.getElementById('hide-completed-toggle').checked;
-      const searchKeyword = (document.getElementById('search-keyword').value || '').toLowerCase().trim();
       const todayStr = formatDateISO(new Date());
 
       container.innerHTML = '';
-
       let allTasks = [];
 
       appData.lectures.forEach(lec => {
         Object.keys(lec.blocks).forEach(key => {
-          const block = lec.blocks[key];
+          const b = lec.blocks[key];
           allTasks.push({
             type: 'cycle',
             id: lec.id,
             title: lec.title,
             category: lec.category,
             blockKey: key,
-            date: block.date,
-            completed: block.completed,
-            isOverdue: block.date < todayStr && !block.completed
+            date: b.date,
+            completed: b.completed
           });
         });
       });
@@ -503,90 +418,114 @@
           type: 'other',
           id: st.id,
           title: st.title,
-          category: 'その他',
+          category: st.category || 'その他',
           blockKey: 'OTHER',
           date: st.date,
-          completed: st.completed,
-          isOverdue: st.date < todayStr && !st.completed
+          completed: st.completed
         });
       });
 
-      allTasks.sort((a, b) => a.date.localeCompare(b.date));
+      if (hideCompleted) allTasks = allTasks.filter(t => !t.completed);
 
-      const uncompletedCount = allTasks.filter(t => !t.completed).length;
-      document.getElementById('todo-badge').innerText = uncompletedCount;
-      document.getElementById('todo-summary').innerText = `残タスク: ${uncompletedCount}件`;
+      // 日付ごとにグループ化
+      const grouped = {};
+      allTasks.forEach(t => {
+        if (!grouped[t.date]) grouped[t.date] = [];
+        grouped[t.date].push(t);
+      });
 
-      let filteredTasks = allTasks;
-      if (hideCompleted) filteredTasks = filteredTasks.filter(t => !t.completed);
-      if (searchKeyword) {
-        filteredTasks = filteredTasks.filter(t => 
-          t.title.toLowerCase().includes(searchKeyword) || 
-          t.category.toLowerCase().includes(searchKeyword)
-        );
-      }
+      const sortedDates = Object.keys(grouped).sort();
 
-      if (filteredTasks.length === 0) {
-        container.innerHTML = `
-          <div class="bg-white rounded-2xl p-8 text-center border border-slate-200 shadow-sm">
-            <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-xl">
-              <i class="fa-solid fa-check"></i>
-            </div>
-            <h3 class="font-bold text-slate-800">表示できるタスクはありません</h3>
-          </div>
-        `;
+      if (sortedDates.length === 0) {
+        container.innerHTML = `<div class="text-center text-slate-500 py-10">表示できるタスクはありません</div>`;
         return;
       }
 
-      filteredTasks.forEach(item => {
-        const isToday = item.date === todayStr;
+      sortedDates.forEach(dateStr => {
+        const groupEl = document.createElement('div');
+        groupEl.className = "space-y-2";
 
-        const card = document.createElement('div');
-        card.className = `bg-white rounded-xl p-3.5 border transition flex items-center justify-between gap-3 shadow-sm ${
-          item.completed ? 'opacity-50 bg-slate-50 border-slate-200' : item.isOverdue ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 hover:border-blue-300'
-        }`;
+        const isToday = dateStr === todayStr;
+        const headerTitle = formatDateHeader(dateStr);
 
-        card.innerHTML = `
-          <div class="flex items-center space-x-3 flex-1 min-w-0">
-            <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleTaskStatus('${item.type}', '${item.id}', '${item.blockKey}')" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center space-x-2 flex-wrap gap-y-1 mb-0.5">
-                ${getBlockBadgeHTML(item.blockKey)}
-                <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">${escapeHTML(item.category)}</span>
-                <span class="text-xs font-bold text-slate-500">${formatDateJP(item.date)}</span>
-                ${isToday ? '<span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">今日</span>' : ''}
-                ${item.isOverdue ? '<span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">遅れ</span>' : ''}
-              </div>
-              <h4 class="font-bold text-sm text-slate-900 truncate ${item.completed ? 'line-through text-slate-500' : ''}">${escapeHTML(item.title)}</h4>
-            </div>
+        groupEl.innerHTML = `
+          <div class="flex justify-between items-center px-1">
+            <h3 class="text-lg font-bold text-slate-100 flex items-center">
+              ${headerTitle}
+              ${isToday ? '<span class="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">今日</span>' : ''}
+            </h3>
+            ${isToday ? `
+              <button onclick="openNewOtherModal()" class="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-400 text-white flex items-center justify-center font-bold shadow">
+                <i class="fa-solid fa-plus"></i>
+              </button>
+            ` : ''}
           </div>
-
-          <div class="flex items-center space-x-1">
-            <button onclick="quickDirectShift('${item.type}', '${item.id}', '${item.blockKey}', 1)" class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold transition" title="+1日延期">+1日</button>
-            <button onclick="openShiftModal('${item.type}', '${item.id}', '${item.blockKey}')" class="px-2.5 py-1.5 text-xs text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition font-medium">
-              <i class="fa-regular fa-calendar-minus mr-1"></i> 変更
-            </button>
-            <button onclick="deleteSingleOrTask('${item.type}', '${item.id}', '${item.blockKey}')" class="p-1.5 text-slate-300 hover:text-red-500 rounded-lg">
-              <i class="fa-solid fa-trash-can text-xs"></i>
-            </button>
+          <div class="space-y-2 drop-zone p-1 rounded-2xl min-h-[50px] transition" data-date="${dateStr}">
           </div>
         `;
 
-        container.appendChild(card);
+        const cardsContainer = groupEl.querySelector('.drop-zone');
+
+        // ドラッグオーバー処理
+        cardsContainer.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          cardsContainer.classList.add('drag-over');
+        });
+        cardsContainer.addEventListener('dragleave', () => {
+          cardsContainer.classList.remove('drag-over');
+        });
+        cardsContainer.addEventListener('drop', (e) => {
+          e.preventDefault();
+          cardsContainer.classList.remove('drag-over');
+          if (draggedTask) {
+            handleTaskDrop(draggedTask, dateStr);
+          }
+        });
+
+        grouped[dateStr].forEach(task => {
+          const card = document.createElement('div');
+          card.draggable = true;
+          card.className = `task-card bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-3 rounded-full flex items-center justify-between shadow ${
+            task.completed ? 'opacity-40 bg-slate-800 text-slate-400' : ''
+          }`;
+
+          card.innerHTML = `
+            <div class="flex items-center space-x-3 truncate flex-1 cursor-pointer" onclick="toggleTaskStatus('${task.type}', '${task.id}', '${task.blockKey}')">
+              <div class="w-5 h-5 rounded-full border-2 border-white/80 flex items-center justify-center text-xs flex-shrink-0 ${task.completed ? 'bg-white text-blue-600 border-white' : ''}">
+                ${task.completed ? '<i class="fa-solid fa-check"></i>' : ''}
+              </div>
+              <span class="truncate text-sm tracking-wide">
+                ${task.category ? `<span class="opacity-80 font-normal mr-2">${escapeHTML(task.category)}</span>` : ''}
+                ${escapeHTML(task.title)}
+              </span>
+            </div>
+            <button onclick="event.stopPropagation(); openShiftModal('${task.type}', '${task.id}', '${task.blockKey}')" class="text-white/70 hover:text-white p-1 ml-2">
+              <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
+            </button>
+          `;
+
+          // ドラッグイベント
+          card.addEventListener('dragstart', () => {
+            draggedTask = task;
+          });
+          card.addEventListener('dragend', () => {
+            draggedTask = null;
+          });
+
+          cardsContainer.appendChild(card);
+        });
+
+        container.appendChild(groupEl);
       });
     }
 
-    function quickDirectShift(type, id, blockKey, days) {
-      if (type === 'cycle') {
-        const lec = appData.lectures.find(l => l.id === id);
-        if (lec && lec.blocks[blockKey]) {
-          const newDate = addDays(lec.blocks[blockKey].date, days);
-          shiftCycleBlockDate(id, blockKey, newDate);
-        }
+    function handleTaskDrop(task, targetDate) {
+      if (task.type === 'cycle') {
+        shiftCycleBlockDate(task.id, task.blockKey, targetDate);
       } else {
-        const st = appData.otherTasks.find(t => t.id === id);
+        const st = appData.otherTasks.find(t => t.id === task.id);
         if (st) {
-          st.date = addDays(st.date, days);
+          st.date = targetDate;
           saveLocalData();
         }
       }
@@ -596,36 +535,13 @@
     function toggleTaskStatus(type, id, blockKey) {
       if (type === 'cycle') {
         const lec = appData.lectures.find(l => l.id === id);
-        if (lec && lec.blocks[blockKey]) {
-          lec.blocks[blockKey].completed = !lec.blocks[blockKey].completed;
-        }
+        if (lec && lec.blocks[blockKey]) lec.blocks[blockKey].completed = !lec.blocks[blockKey].completed;
       } else {
         const st = appData.otherTasks.find(t => t.id === id);
-        if (st) {
-          st.completed = !st.completed;
-        }
+        if (st) st.completed = !st.completed;
       }
       saveLocalData();
       renderCurrentView();
-    }
-
-    function deleteSingleOrTask(type, id, blockKey) {
-      if (type === 'other') {
-        if (confirm('この「その他」タスクを削除しますか？')) {
-          appData.otherTasks = appData.otherTasks.filter(t => t.id !== id);
-          saveLocalData();
-          renderCurrentView();
-        }
-      } else {
-        if (confirm(`この講義ステップ【${blockKey}】を削除しますか？`)) {
-          const lec = appData.lectures.find(l => l.id === id);
-          if (lec) {
-            delete lec.blocks[blockKey];
-            saveLocalData();
-            renderCurrentView();
-          }
-        }
-      }
     }
 
     function renderCalendarView() {
@@ -634,7 +550,6 @@
       const hideCompleted = document.getElementById('hide-completed-toggle').checked;
 
       document.getElementById('calendar-month-year').innerText = `${year}年 ${month + 1}月`;
-
       const grid = document.getElementById('calendar-days-grid');
       grid.innerHTML = '';
 
@@ -648,34 +563,20 @@
         Object.keys(lec.blocks).forEach(key => {
           const b = lec.blocks[key];
           if (hideCompleted && b.completed) return;
-
           if (!calendarMap[b.date]) calendarMap[b.date] = [];
-          calendarMap[b.date].push({
-            type: 'cycle',
-            id: lec.id,
-            title: lec.title,
-            key: key,
-            completed: b.completed
-          });
+          calendarMap[b.date].push({ type: 'cycle', id: lec.id, title: lec.title, key: key, completed: b.completed });
         });
       });
 
       appData.otherTasks.forEach(st => {
         if (hideCompleted && st.completed) return;
-
         if (!calendarMap[st.date]) calendarMap[st.date] = [];
-        calendarMap[st.date].push({
-          type: 'other',
-          id: st.id,
-          title: st.title,
-          key: 'OTHER',
-          completed: st.completed
-        });
+        calendarMap[st.date].push({ type: 'other', id: st.id, title: st.title, key: 'OTHER', completed: st.completed });
       });
 
       for (let i = 0; i < firstDay; i++) {
         const cell = document.createElement('div');
-        cell.className = 'min-h-[90px] p-1 bg-slate-50/50 text-slate-300 text-xs';
+        cell.className = 'min-h-[80px] p-1 bg-slate-900/40 text-slate-700 text-xs';
         grid.appendChild(cell);
       }
 
@@ -685,30 +586,29 @@
         const tasks = calendarMap[dateStr] || [];
 
         const cell = document.createElement('div');
-        cell.className = `min-h-[90px] p-1 border-t border-slate-100 transition ${isToday ? 'bg-blue-50/40' : ''}`;
+        cell.className = `min-h-[80px] p-1 border-t border-slate-800 transition drop-zone ${isToday ? 'bg-blue-900/20' : ''}`;
+        cell.setAttribute('data-date', dateStr);
 
-        let badgesHTML = tasks.map(t => {
-          let colorClass = 'bg-blue-600';
-          let label = t.key === 'OTHER' ? 'その他' : t.key;
-          if (t.key === 'B') colorClass = 'bg-emerald-600';
-          if (t.key === 'C') colorClass = 'bg-amber-600';
-          if (t.key === 'D') colorClass = 'bg-purple-600';
+        cell.addEventListener('dragover', (e) => { e.preventDefault(); cell.classList.add('drag-over'); });
+        cell.addEventListener('dragleave', () => { cell.classList.remove('drag-over'); });
+        cell.addEventListener('drop', (e) => {
+          e.preventDefault();
+          cell.classList.remove('drag-over');
+          if (draggedTask) handleTaskDrop(draggedTask, dateStr);
+        });
 
-          return `
-            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1 py-0.5 text-white font-medium mb-1 cursor-pointer ${colorClass} ${t.completed ? 'opacity-40 line-through' : 'hover:opacity-80'}">
-              ${label}: ${escapeHTML(t.title)}
-            </div>
-          `;
-        }).join('');
+        let badgesHTML = tasks.map(t => `
+          <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white bg-blue-600 mb-1 cursor-pointer hover:bg-blue-500 ${t.completed ? 'opacity-40 line-through' : ''}">
+            ${escapeHTML(t.title)}
+          </div>
+        `).join('');
 
         cell.innerHTML = `
           <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-700'}">${day}</span>
-            ${tasks.length > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${tasks.length}</span>` : ''}
+            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-400'}">${day}</span>
           </div>
-          <div class="space-y-0.5 max-h-16 overflow-y-auto">${badgesHTML}</div>
+          <div class="space-y-0.5 max-h-14 overflow-y-auto">${badgesHTML}</div>
         `;
-
         grid.appendChild(cell);
       }
     }
@@ -728,26 +628,23 @@
       container.innerHTML = '';
 
       if (appData.lectures.length === 0) {
-        container.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8">登録された講義サイクルがありません。</p>';
+        container.innerHTML = '<p class="col-span-full text-center text-slate-500 py-8">登録された講義サイクルがありません。</p>';
         return;
       }
 
       appData.lectures.forEach(lec => {
         const card = document.createElement('div');
-        card.className = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4';
+        card.className = 'bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3';
 
         let blocksHTML = ['A', 'B', 'C', 'D'].map(k => {
           const b = lec.blocks[k];
           if (!b) return '';
           return `
-            <div class="flex items-center justify-between text-xs py-2 border-b border-slate-100 last:border-0">
+            <div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-800 last:border-0">
+              <span class="text-slate-300 font-medium">${b.label}: ${formatDateHeader(b.date)}</span>
               <div class="flex items-center space-x-2">
-                ${getBlockBadgeHTML(k)}
-                <span class="font-semibold text-slate-700">${formatDateJP(b.date)}</span>
-              </div>
-              <div class="flex items-center space-x-2">
-                ${b.completed ? '<span class="text-emerald-600 font-bold"><i class="fa-solid fa-check"></i> 完了</span>' : '<span class="text-slate-400">未処理</span>'}
-                <button onclick="openShiftModal('cycle', '${lec.id}', '${k}')" class="text-blue-600 hover:underline">変更</button>
+                ${b.completed ? '<span class="text-emerald-400 font-bold">完了</span>' : '<span class="text-slate-500">未処理</span>'}
+                <button onclick="openShiftModal('cycle', '${lec.id}', '${k}')" class="text-blue-400 hover:underline">変更</button>
               </div>
             </div>
           `;
@@ -756,27 +653,26 @@
         card.innerHTML = `
           <div class="flex justify-between items-start">
             <div>
-              <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold mb-1 inline-block">${escapeHTML(lec.category)}</span>
-              <h3 class="font-bold text-slate-900 text-base">${escapeHTML(lec.title)}</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 font-bold inline-block mb-1">${escapeHTML(lec.category)}</span>
+              <h3 class="font-bold text-white text-sm">${escapeHTML(lec.title)}</h3>
             </div>
-            <button onclick="deleteLectureCycle('${lec.id}')" class="text-slate-300 hover:text-red-500 p-1"><i class="fa-solid fa-trash-can"></i></button>
+            <button onclick="deleteLectureCycle('${lec.id}')" class="text-slate-600 hover:text-red-400 p-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
           </div>
-          <div class="bg-slate-50 rounded-xl p-3 space-y-1">${blocksHTML}</div>
+          <div class="bg-slate-800/50 rounded-xl p-2.5 space-y-1">${blocksHTML}</div>
         `;
-
         container.appendChild(card);
       });
     }
 
     function deleteLectureCycle(id) {
-      if (confirm('この講義と全復習サイクル（A, B, C, D）を完全削除しますか？')) {
+      if (confirm('この講義サイクルを完全削除しますか？')) {
         appData.lectures = appData.lectures.filter(l => l.id !== id);
         saveLocalData();
         renderCurrentView();
       }
     }
 
-    /* Modals & Actions */
+    /* モーダル＆アクション */
     function openNewLectureModal() {
       document.getElementById('form-lecture').reset();
       document.getElementById('input-date').value = formatDateISO(new Date());
@@ -794,7 +690,6 @@
       const newLec = createLectureCycle(title, category, startDate);
       appData.lectures.unshift(newLec);
       saveLocalData();
-
       closeModal('modal-lecture');
       renderCurrentView();
     }
@@ -835,10 +730,9 @@
         activeShiftContext.oldDate = b.date;
 
         document.getElementById('modal-shift-info').innerHTML = `
-          <div class="font-bold text-slate-900">${escapeHTML(lec.title)}</div>
-          <div class="text-xs text-blue-800 mt-1">対象: ${getBlockBadgeHTML(blockKey)} (現在: ${formatDateJP(b.date)})</div>
+          <div class="font-bold text-white">${escapeHTML(lec.title)}</div>
+          <div class="text-xs text-blue-300 mt-1">現在: ${formatDateHeader(b.date)}</div>
         `;
-        document.getElementById('shift-cascade-warning').classList.remove('hidden');
         document.getElementById('input-shift-date').value = b.date;
       } else {
         const st = appData.otherTasks.find(t => t.id === id);
@@ -846,13 +740,11 @@
         activeShiftContext.oldDate = st.date;
 
         document.getElementById('modal-shift-info').innerHTML = `
-          <div class="font-bold text-slate-900">${escapeHTML(st.title)}</div>
-          <div class="text-xs text-blue-800 mt-1">その他 (現在: ${formatDateJP(st.date)})</div>
+          <div class="font-bold text-white">${escapeHTML(st.title)}</div>
+          <div class="text-xs text-blue-300 mt-1">現在: ${formatDateHeader(st.date)}</div>
         `;
-        document.getElementById('shift-cascade-warning').classList.add('hidden');
         document.getElementById('input-shift-date').value = st.date;
       }
-
       openModal('modal-shift');
     }
 
@@ -872,22 +764,26 @@
         if (st) st.date = newDate;
         saveLocalData();
       }
-
       closeModal('modal-shift');
       renderCurrentView();
     }
 
+    function deleteCurrentTask() {
+      if (confirm('このタスクを削除しますか？')) {
+        if (activeShiftContext.type === 'other') {
+          appData.otherTasks = appData.otherTasks.filter(t => t.id !== activeShiftContext.id);
+        } else {
+          const lec = appData.lectures.find(l => l.id === activeShiftContext.id);
+          if (lec) delete lec.blocks[activeShiftContext.key];
+        }
+        saveLocalData();
+        closeModal('modal-shift');
+        renderCurrentView();
+      }
+    }
+
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-    function getBlockBadgeHTML(key) {
-      if (key === 'A') return '<span class="bg-blue-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">A:講義</span>';
-      if (key === 'B') return '<span class="bg-emerald-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">B:1回目</span>';
-      if (key === 'C') return '<span class="bg-amber-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">C:2回目</span>';
-      if (key === 'D') return '<span class="bg-purple-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">D:3回目</span>';
-      if (key === 'OTHER') return '<span class="bg-blue-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">その他</span>';
-      return '';
-    }
 
     function escapeHTML(str) {
       if (!str) return '';
