@@ -131,6 +131,12 @@
         <input type="checkbox" id="hide-completed-calendar" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
         <span>カレンダー: 完了を隠す</span>
       </label>
+
+      <!-- 講義一覧用のトグル -->
+      <label id="toggle-container-lectures" class="hidden flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+        <input type="checkbox" id="hide-completed-lectures" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
+        <span>講義一覧: 全ステップ完了を隠す</span>
+      </label>
     </div>
 
     <!-- VIEW: TODO LIST (日付グループ化UI) -->
@@ -404,19 +410,21 @@
         }
       });
 
-      // トグルの表示切り替え（ToDo用/カレンダー用）
+      // トグルの表示切り替え（ToDo用/カレンダー用/講義一覧用）
       const toggleTodo = document.getElementById('toggle-container-todo');
       const toggleCal = document.getElementById('toggle-container-calendar');
+      const toggleLec = document.getElementById('toggle-container-lectures');
+
+      toggleTodo.classList.add('hidden');
+      toggleCal.classList.add('hidden');
+      toggleLec.classList.add('hidden');
 
       if (tab === 'todo') {
         toggleTodo.classList.remove('hidden');
-        toggleCal.classList.add('hidden');
       } else if (tab === 'calendar') {
-        toggleTodo.classList.add('hidden');
         toggleCal.classList.remove('hidden');
-      } else {
-        toggleTodo.classList.add('hidden');
-        toggleCal.classList.add('hidden');
+      } else if (tab === 'lectures') {
+        toggleLec.classList.remove('hidden');
       }
 
       renderCurrentView();
@@ -663,6 +671,7 @@
 
     function renderLecturesView() {
       const container = document.getElementById('lecture-cards-container');
+      const hideCompleted = document.getElementById('hide-completed-lectures').checked;
       container.innerHTML = '';
 
       if (appData.lectures.length === 0) {
@@ -670,7 +679,22 @@
         return;
       }
 
-      appData.lectures.forEach(lec => {
+      let displayedLectures = appData.lectures;
+
+      // 「全ステップ完了」の講義サイクルを隠す設定
+      if (hideCompleted) {
+        displayedLectures = displayedLectures.filter(lec => {
+          const keys = Object.keys(lec.blocks);
+          return !keys.every(k => lec.blocks[k].completed);
+        });
+      }
+
+      if (displayedLectures.length === 0) {
+        container.innerHTML = '<p class="col-span-full text-center text-slate-500 py-8">表示できる講義はありません（すべて完了済み）</p>';
+        return;
+      }
+
+      displayedLectures.forEach(lec => {
         const card = document.createElement('div');
         card.className = 'bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3';
 
@@ -825,7 +849,7 @@
 
     function escapeHTML(str) {
       if (!str) return '';
-      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&#34;' }[tag] || tag));
     }
   </script>
 </body>
