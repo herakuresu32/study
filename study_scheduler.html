@@ -3,332 +3,1024 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>復習・学習スケジュール管理（安全保存版）</title>
-  <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: #f0f2f5; margin: 0; padding: 12px; color: #333; }
-    .container { max-width: 900px; margin: 0 auto; }
-    .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    h3 { margin-top: 0; color: #1a73e8; }
-    .sync-bar { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 10px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.9rem; flex-wrap: wrap; gap: 8px; }
-    .btn { background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    .btn-success { background: #34a853; }
-    .btn-danger { background: #d93025; }
-    .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
-    input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; margin-right: 8px; margin-bottom: 8px; }
-    
-    /* カレンダー */
-    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-    .cal-day-head { font-weight: bold; font-size: 0.8rem; color: #666; padding: 4px 0; }
-    .cal-cell { background: #fafafa; border: 1px solid #eee; min-height: 80px; border-radius: 6px; padding: 2px; font-size: 0.75rem; text-align: left; }
-    .cal-cell.today { background: #e8f0fe; border-color: #1a73e8; }
-    .cal-date { font-weight: bold; padding: 2px 4px; color: #555; }
-
-    /* バッジ */
-    .badge { display: block; padding: 2px 4px; border-radius: 4px; color: white; font-size: 0.75rem; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .type-A { background: #4285f4; } /* 講義 / その他 */
-    .type-B { background: #34a853; } /* 復習1 */
-    .type-C { background: #fbbc05; color: #000; } /* 復習2 */
-    .type-D { background: #ea4335; } /* 復習3 */
-
-    /* ToDo リスト */
-    .todo-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; gap: 8px; }
-    .todo-item.done span { text-decoration: line-through; color: #a0a0a0; }
-    .todo-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
-    .shift-btns { display: flex; gap: 4px; }
-  </style>
-</head>
-<body>
-
-<div class="container">
-
-  <!-- 同期・バックアップバー -->
-  <div class="sync-bar">
-    <div>
-      💾 データ保存状態: <strong style="color:#34a853;">端末内に安全保存中</strong>
-    </div>
-    <div>
-      <button class="btn btn-sm btn-success" onclick="exportData()">📤 同期データをコピー</button>
-      <button class="btn btn-sm" onclick="importData()">📥 同期データを読み込み</button>
-    </div>
-  </div>
-
-  <!-- タスク追加フォーム -->
-  <div class="card">
-    <h3>📝 タスクの追加</h3>
-    <div>
-      <input type="text" id="task-title" placeholder="タイトル（例: 簿記 第1講）" style="width: 220px;">
-      <select id="task-type">
-        <option value="cycle">【連動サイクル】講義 + 3回復習（A→B→C→D）</option>
-        <option value="single">【その他】単体タスク（Aと同じ青色）</option>
-      </select>
-      <input type="date" id="task-date">
-      <button class="btn" onclick="addTask()">追加</button>
-    </div>
-  </div>
-
-  <!-- カレンダー表示 -->
-  <div class="card">
-    <div class="cal-header">
-      <button class="btn btn-sm" onclick="moveMonth(-1)">◀ 前月</button>
-      <h3 id="cal-month-title" style="margin:0;">2026年 10月</h3>
-      <button class="btn btn-sm" onclick="moveMonth(1)">翌月 ▶</button>
-    </div>
-    <div class="cal-grid" id="cal-grid"></div>
-  </div>
-
-  <!-- ToDo リスト -->
-  <div class="card">
-    <h3>✅ ToDoリスト（予定順）</h3>
-    <div id="todo-list">読み込み中...</div>
-  </div>
-
-</div>
-
-<script>
-  let tasks = [];
-  let currentDate = new Date();
-
-  document.getElementById('task-date').valueAsDate = new Date();
-
-  // ローカルストレージからデータ読み込み
-  function loadLocalData() {
-    const saved = localStorage.getItem('study_tasks_data_safe');
-    if (saved) {
-      try {
-        tasks = JSON.parse(saved);
-      } catch(e) {
-        tasks = [];
-      }
-    }
-    render();
-  }
-
-  // ローカルストレージに保存
-  function saveLocalData() {
-    localStorage.setItem('study_tasks_data_safe', JSON.stringify(tasks));
-    render();
-  }
-
-  // データ書き出し（クリップボードコピー）
-  function exportData() {
-    if (tasks.length === 0) {
-      alert("共有するタスクデータがありません。");
-      return;
-    }
-    const jsonStr = JSON.stringify(tasks);
-    navigator.clipboard.writeText(jsonStr).then(() => {
-      alert("同期用データコードをコピーしました！\nこのコードをLINEやメール等でスマホ/PCに送り、「同期データを読み込み」ボタンで貼り付けてください。");
-    }).catch(() => {
-      prompt("以下のコードを全選択してコピーしてください:", jsonStr);
-    });
-  }
-
-  // データ読み込み
-  function importData() {
-    const input = prompt("共有された同期データコード（テキスト）を貼り付けてください:");
-    if (input && input.trim() !== "") {
-      try {
-        const imported = JSON.parse(input.trim());
-        if (Array.isArray(imported)) {
-          tasks = imported;
-          saveLocalData();
-          alert("データの同期・取り込みが完了しました！");
-        } else {
-          alert("データ形式が正しくありません。");
+  <title>忘却曲線・復習スケジュール＆ToDo管理（クラウドリアルタイム同期版）</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            typeA: '#2563eb', // A: 講義 / その他 (ロイヤルブルー)
+            typeB: '#059669', // B: 1回目 (エメラルド)
+            typeC: '#d97706', // C: 2回目 (アンバー)
+            typeD: '#7c3aed', // D: 3回目 (パープル)
+          }
         }
-      } catch(e) {
-        alert("データの読み込みに失敗しました。正しくコードが貼り付けられているかご確認ください。");
       }
     }
-  }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  </style>
 
-  // タスク追加
-  function addTask() {
-    const title = document.getElementById('task-title').value.trim();
-    const type = document.getElementById('task-type').value;
-    const dateStr = document.getElementById('task-date').value;
+  <!-- Firebase JavaScript SDK (v11.6.1 Moduled Integration) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    if (!title || !dateStr) {
-      alert("タイトルと日付を入力してください。");
-      return;
+    // Global configurations
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'study-scheduler-default';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "AIzaSyDemoDummyKeyForLocalTestingMode",
+      authDomain: "demo-app.firebaseapp.com",
+      projectId: "demo-app",
+      storageBucket: "demo-app.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:demo"
+    };
+
+    let app, db, auth;
+    let currentRoomId = 'default-room';
+    let unsubscribeSnapshot = null;
+    let isInternalUpdate = false;
+
+    // Window global bindings for non-module script interaction
+    window.CloudSync = {
+      init: async function(roomId, onDataReceived, onSyncStatusChange) {
+        currentRoomId = roomId || 'default-room';
+        
+        try {
+          app = initializeApp(firebaseConfig);
+          auth = getAuth(app);
+          db = getFirestore(app);
+
+          // Authenticate
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+
+          onAuthStateChanged(auth, (user) => {
+            if (user) {
+              this.subscribeToRoom(currentRoomId, onDataReceived, onSyncStatusChange);
+            } else {
+              onSyncStatusChange(false, '未認証');
+            }
+          });
+        } catch (e) {
+          console.warn('Firebase init fallback to local:', e);
+          onSyncStatusChange(false, 'ローカル保存モード');
+        }
+      },
+
+      subscribeToRoom: function(roomId, onDataReceived, onSyncStatusChange) {
+        currentRoomId = roomId;
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+
+        if (!db) {
+          onSyncStatusChange(false, 'ローカル保存モード');
+          return;
+        }
+
+        const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+
+        onSyncStatusChange(true, '同期中...', roomId);
+
+        unsubscribeSnapshot = onSnapshot(roomDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data && data.appData) {
+              isInternalUpdate = true;
+              onDataReceived(data.appData);
+              isInternalUpdate = false;
+            }
+          } else {
+            // First time room creation
+            window.saveDataToCloud();
+          }
+          onSyncStatusChange(true, 'リアルタイム連動中', roomId);
+        }, (error) => {
+          console.error('Firestore Error:', error);
+          onSyncStatusChange(false, '同期エラー (ローカル保存中)');
+        });
+      },
+
+      pushData: async function(appData) {
+        if (isInternalUpdate) return; // Prevent loop
+        if (!db) return;
+
+        try {
+          const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+          await setDoc(roomDocRef, {
+            appData: appData,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (e) {
+          console.error('Error saving to cloud:', e);
+        }
+      }
+    };
+  </script>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- TOP STATUS & ROOM SYNC BAR -->
+  <div class="bg-slate-900 text-white text-xs py-2 px-4 shadow-inner">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-2">
+        <span id="sync-indicator-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="sync-status-text" class="font-medium text-slate-200">リアルタイムクラウド自動同期中</span>
+        <span id="sync-room-badge" class="bg-slate-800 border border-slate-700 text-blue-300 px-2 py-0.5 rounded-md font-mono text-[11px]">Room: default</span>
+      </div>
+
+      <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-2 py-1">
+          <i class="fa-solid fa-key text-slate-400 mr-1.5"></i>
+          <input type="text" id="input-room-id" placeholder="部屋コード (例: my-study-room)" class="bg-transparent text-white text-xs focus:outline-none w-36 font-mono">
+          <button onclick="changeSyncRoom()" class="ml-1 bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded text-[11px] font-bold transition">接続</button>
+        </div>
+        <button onclick="copyShareLink()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center transition" title="この部屋の共有リンクをコピー">
+          <i class="fa-regular fa-share-from-square mr-1 text-emerald-400"></i> 共有
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
+            <i class="fa-solid fa-brain text-xl"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg leading-tight text-slate-900">忘却曲線 復習マネージャー</h1>
+            <p class="text-xs text-slate-500">クラウド自動同期 & カレンダー機能</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="openNewOtherModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center transition">
+            <i class="fa-solid fa-plus mr-1.5 text-blue-600"></i> その他(単体)
+          </button>
+          <button onclick="openNewLectureModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center transition shadow-sm">
+            <i class="fa-solid fa-layer-group mr-1.5"></i> 講義サイクル追加
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <!-- Tabs -->
+      <div class="flex bg-slate-200/80 p-1 rounded-xl text-sm font-medium">
+        <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg transition flex items-center space-x-2 bg-white text-slate-900 shadow-sm">
+          <i class="fa-solid fa-list-check text-blue-600"></i>
+          <span>ToDoリスト</span>
+          <span id="todo-badge" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-bold">0</span>
+        </button>
+        <button id="tab-calendar" onclick="switchTab('calendar')" class="px-4 py-2 rounded-lg transition flex items-center space-x-2 text-slate-600 hover:text-slate-900">
+          <i class="fa-regular fa-calendar-days text-slate-500"></i>
+          <span>カレンダー</span>
+        </button>
+        <button id="tab-lectures" onclick="switchTab('lectures')" class="px-4 py-2 rounded-lg transition flex items-center space-x-2 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-book-bookmark text-slate-500"></i>
+          <span>講義管理</span>
+        </button>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex items-center space-x-3 text-sm">
+        <label class="flex items-center space-x-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+          <input type="checkbox" id="hide-completed-toggle" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-blue-500">
+          <span class="text-xs font-semibold text-slate-700">完了タスクを隠す</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- VIEW: TODO LIST -->
+    <section id="view-todo" class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-base font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-clock-rotate-left text-blue-600 mr-2"></i> 本日・今後のタスク
+        </h2>
+        <span class="text-xs text-slate-500" id="todo-summary">--</span>
+      </div>
+
+      <div id="todo-list-container" class="space-y-3">
+        <!-- Dynamic content -->
+      </div>
+    </section>
+
+    <!-- VIEW: CALENDAR -->
+    <section id="view-calendar" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <!-- Calendar Controls -->
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div class="flex items-center space-x-3">
+            <h2 id="calendar-month-year" class="text-lg font-bold text-slate-900">--年 --月</h2>
+            <button onclick="changeCalendarMonth(-1)" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="resetCalendarToToday()" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold">今日</button>
+            <button onclick="changeCalendarMonth(1)" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+
+          <!-- Color Legend -->
+          <div class="flex items-center space-x-3 text-xs flex-wrap gap-y-1">
+            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-600 mr-1"></span> A:講義 / その他</span>
+            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-600 mr-1"></span> B:1回目(1〜2日目)</span>
+            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-600 mr-1"></span> C:2回目(4〜5日目)</span>
+            <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-purple-600 mr-1"></span> D:3回目(13〜14日目)</span>
+          </div>
+        </div>
+
+        <div class="calendar-grid text-center font-bold text-xs text-slate-400 py-2 border-b border-slate-100">
+          <div class="text-red-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
+        </div>
+
+        <div id="calendar-days-grid" class="calendar-grid divide-x divide-y divide-slate-100 border-b border-slate-100">
+          <!-- Dynamic grid -->
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: LECTURES LIST -->
+    <section id="view-lectures" class="hidden space-y-4">
+      <div id="lecture-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Dynamic cards -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold border border-slate-700 flex items-center space-x-2 transition-all transform translate-y-10 opacity-0 pointer-events-none z-50">
+    <i class="fa-solid fa-circle-check text-emerald-400 text-sm" id="toast-icon"></i>
+    <span id="toast-msg">メッセージ</span>
+  </div>
+
+  <!-- Modal: New Lecture Cycle -->
+  <div id="modal-lecture" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-slate-900">新規講義サイクルの登録</h3>
+        <button onclick="closeModal('modal-lecture')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="form-lecture" onsubmit="saveNewLecture(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">講義名・テーマ <span class="text-red-500">*</span></label>
+          <input type="text" id="input-title" required placeholder="例: 行政法 第3講" class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">科目 / カテゴリ</label>
+            <input type="text" id="input-category" placeholder="例: 法律, 英語" class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">講義受講日 (A: 1日目) <span class="text-red-500">*</span></label>
+            <input type="date" id="input-date" required class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+          <div class="font-bold text-slate-700 mb-1">自動作成される連動サイクル:</div>
+          <div class="flex items-center text-blue-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 mr-2"></span>【A】講義 (1日目)</div>
+          <div class="flex items-center text-emerald-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600 mr-2"></span>【B】1回目復習 (翌日: +1日)</div>
+          <div class="flex items-center text-amber-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-amber-600 mr-2"></span>【C】2回目復習 (4日目: +3日)</div>
+          <div class="flex items-center text-purple-700 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-purple-600 mr-2"></span>【D】3回目復習 (13日目: +12日)</div>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modal-lecture')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm">サイクルを作成</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: New Single Task ("その他") -->
+  <div id="modal-other" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-slate-900">単体タスクの追加 (その他)</h3>
+        <button onclick="closeModal('modal-other')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="form-other" onsubmit="saveNewOtherTask(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">タスク名 <span class="text-red-500">*</span></label>
+          <input type="text" id="input-other-title" required placeholder="例: 問題集P.40〜55を解く" class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">予定日 <span class="text-red-500">*</span></label>
+          <input type="date" id="input-other-date" required class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <p class="text-xs text-slate-500 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+          <i class="fa-solid fa-circle-info text-blue-600 mr-1"></i> 「その他」のタスクは【A:講義】と同じ青色カラーで登録・表示されます。
+        </p>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modal-other')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm">追加する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Shift / Adjust Dates -->
+  <div id="modal-shift" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-slate-900">日程ズラし・連動修正</h3>
+        <button onclick="closeModal('modal-shift')" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div id="modal-shift-info" class="bg-blue-50 border border-blue-100 p-3.5 rounded-xl mb-4 text-sm text-blue-900">
+        <!-- Dynamic -->
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-2">クイック延期</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button onclick="shiftQuickOffset(1)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+1日</button>
+            <button onclick="shiftQuickOffset(2)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+2日</button>
+            <button onclick="shiftQuickOffset(3)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+3日</button>
+            <button onclick="shiftQuickOffset(7)" class="py-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 rounded-lg text-sm font-bold">+7日</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">新しい日付を指定</label>
+          <input type="date" id="input-shift-date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div id="shift-cascade-warning" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+          <i class="fa-solid fa-arrows-split-up-and-left mr-1"></i> <strong>スマート連動:</strong> 未完了のこれ以降のステップ（BCD等）も同じ日数分まとめてスライドします。
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button onclick="closeModal('modal-shift')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
+          <button onclick="saveShiftAction()" class="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm">変更を適用</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const LOCAL_STORAGE_KEY = 'forgetting_curve_hybrid_data_v1';
+    
+    let appData = {
+      lectures: [],
+      otherTasks: []
+    };
+
+    let activeRoomId = 'default-room';
+    let calendarCurrentDate = new Date();
+    let currentViewTab = 'todo';
+    let activeShiftContext = { type: 'cycle', id: null, key: null, oldDate: null };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Check room ID from URL search params
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        activeRoomId = roomParam;
+      } else {
+        const savedRoom = localStorage.getItem('hybrid_sync_room_id');
+        if (savedRoom) activeRoomId = savedRoom;
+      }
+
+      document.getElementById('input-room-id').value = activeRoomId;
+      document.getElementById('sync-room-badge').innerText = `Room: ${activeRoomId}`;
+
+      // Initialize local storage cache
+      loadLocalCache();
+
+      // Initialize Cloud Realtime Sync
+      if (window.CloudSync) {
+        window.CloudSync.init(activeRoomId, onCloudDataReceived, updateSyncStatusUI);
+      } else {
+        updateSyncStatusUI(false, 'ローカル保存中');
+      }
+
+      renderCurrentView();
+    });
+
+    function loadLocalCache() {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (stored) {
+        try {
+          appData = JSON.parse(stored);
+          if (!appData.otherTasks) appData.otherTasks = [];
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        // Initial sample data
+        const today = formatDateISO(new Date());
+        appData.lectures = [
+          createLectureCycle("行政法 第1講", "法律", today)
+        ];
+        appData.otherTasks = [
+          { id: generateId(), title: "参考書購入・受講準備", category: "その他", date: today, completed: false }
+        ];
+        saveData();
+      }
     }
 
-    const baseDate = new Date(dateStr);
-    const cycleId = 'c-' + Date.now();
+    function saveData() {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appData));
+      window.saveDataToCloud();
+    }
 
-    if (type === 'single') {
-      tasks.push({
-        id: 't-' + Date.now(),
+    window.saveDataToCloud = function() {
+      if (window.CloudSync) {
+        window.CloudSync.pushData(appData);
+      }
+    };
+
+    function onCloudDataReceived(newCloudData) {
+      if (newCloudData && typeof newCloudData === 'object') {
+        appData = newCloudData;
+        if (!appData.lectures) appData.lectures = [];
+        if (!appData.otherTasks) appData.otherTasks = [];
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appData));
+        renderCurrentView();
+      }
+    }
+
+    function updateSyncStatusUI(isSynced, statusText, roomId) {
+      const dot = document.getElementById('sync-indicator-dot');
+      const text = document.getElementById('sync-status-text');
+      const badge = document.getElementById('sync-room-badge');
+
+      if (isSynced) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+        text.innerText = `クラウド自動同期中 (${statusText})`;
+      } else {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+        text.innerText = statusText || "ローカル保存モード";
+      }
+
+      if (roomId) {
+        badge.innerText = `Room: ${roomId}`;
+      }
+    }
+
+    function changeSyncRoom() {
+      const newRoom = document.getElementById('input-room-id').value.trim();
+      if (!newRoom) return;
+
+      activeRoomId = newRoom;
+      localStorage.setItem('hybrid_sync_room_id', activeRoomId);
+
+      // Update URL without reload
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('room', activeRoomId);
+      window.history.pushState({}, '', newUrl);
+
+      if (window.CloudSync) {
+        window.CloudSync.subscribeToRoom(activeRoomId, onCloudDataReceived, updateSyncStatusUI);
+      }
+
+      showToast(`同期ルームを 「${activeRoomId}」 に切り替えました`);
+    }
+
+    function copyShareLink() {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(activeRoomId)}`;
+      
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast('共有リンクをクリップボードにコピーしました！');
+        });
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = shareUrl;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showToast('共有リンクをコピーしました！');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    /* Date Utilities */
+    function formatDateISO(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function parseDate(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function addDays(dateStr, days) {
+      const d = parseDate(dateStr);
+      d.setDate(d.getDate() + Number(days));
+      return formatDateISO(d);
+    }
+
+    function dateDiff(dateStr1, dateStr2) {
+      const d1 = parseDate(dateStr1);
+      const d2 = parseDate(dateStr2);
+      return Math.round((d2 - d1) / (1000 * 3600 * 24));
+    }
+
+    function formatDateJP(dateStr) {
+      const d = parseDate(dateStr);
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${d.getMonth() + 1}月${d.getDate()}日(${days[d.getDay()]})`;
+    }
+
+    function generateId() {
+      return 'id_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    /* Cycle Factory */
+    function createLectureCycle(title, category, startDateStr) {
+      return {
+        id: generateId(),
         title: title,
-        date: dateStr,
-        stage: 'single',
-        done: false
-      });
-    } else {
-      const offsets = [
-        { stage: 'A', offset: 0, label: '【講義】' },
-        { stage: 'B', offset: 1, label: '【復習1】' },
-        { stage: 'C', offset: 4, label: '【復習2】' },
-        { stage: 'D', offset: 13, label: '【復習3】' }
-      ];
+        category: category || "講義",
+        blocks: {
+          A: { key: 'A', label: '【A】講義受講', date: startDateStr, completed: false },
+          B: { key: 'B', label: '【B】1回目復習', date: addDays(startDateStr, 1), completed: false },
+          C: { key: 'C', label: '【C】2回目復習', date: addDays(startDateStr, 3), completed: false },
+          D: { key: 'D', label: '【D】3回目復習', date: addDays(startDateStr, 12), completed: false }
+        }
+      };
+    }
 
-      offsets.forEach((opt, idx) => {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + opt.offset);
-        tasks.push({
-          id: 't-' + Date.now() + '-' + idx,
-          cycleId: cycleId,
-          title: opt.label + title,
-          date: d.toISOString().split('T')[0],
-          stage: opt.stage,
-          done: false
+    /* CASCADE SHIFT ENGINE */
+    function shiftCycleBlockDate(lectureId, blockKey, newDateStr) {
+      const lec = appData.lectures.find(l => l.id === lectureId);
+      if (!lec) return;
+
+      const targetBlock = lec.blocks[blockKey];
+      const diff = dateDiff(targetBlock.date, newDateStr);
+
+      if (diff === 0) return;
+
+      const keys = ['A', 'B', 'C', 'D'];
+      const startIndex = keys.indexOf(blockKey);
+
+      for (let i = startIndex; i < keys.length; i++) {
+        const k = keys[i];
+        if (i === startIndex || !lec.blocks[k].completed) {
+          lec.blocks[k].date = addDays(lec.blocks[k].date, diff);
+        }
+      }
+
+      saveData();
+    }
+
+    function switchTab(tab) {
+      currentViewTab = tab;
+      ['todo', 'calendar', 'lectures'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const view = document.getElementById(`view-${t}`);
+        if (t === tab) {
+          btn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+          btn.classList.remove('text-slate-600');
+          view.classList.remove('hidden');
+        } else {
+          btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+          btn.classList.add('text-slate-600');
+          view.classList.add('hidden');
+        }
+      });
+
+      renderCurrentView();
+    }
+
+    function renderCurrentView() {
+      if (currentViewTab === 'todo') renderToDoView();
+      if (currentViewTab === 'calendar') renderCalendarView();
+      if (currentViewTab === 'lectures') renderLecturesView();
+    }
+
+    function renderToDoView() {
+      const container = document.getElementById('todo-list-container');
+      const hideCompleted = document.getElementById('hide-completed-toggle').checked;
+      const todayStr = formatDateISO(new Date());
+
+      container.innerHTML = '';
+
+      let allTasks = [];
+
+      // Collect Cycle Tasks
+      appData.lectures.forEach(lec => {
+        ['A', 'B', 'C', 'D'].forEach(key => {
+          const block = lec.blocks[key];
+          if (!block) return;
+          allTasks.push({
+            type: 'cycle',
+            id: lec.id,
+            title: lec.title,
+            category: lec.category,
+            blockKey: key,
+            date: block.date,
+            completed: block.completed,
+            isOverdue: block.date < todayStr && !block.completed
+          });
         });
       });
+
+      // Collect Other Tasks
+      appData.otherTasks.forEach(st => {
+        allTasks.push({
+          type: 'other',
+          id: st.id,
+          title: st.title,
+          category: 'その他',
+          blockKey: 'OTHER',
+          date: st.date,
+          completed: st.completed,
+          isOverdue: st.date < todayStr && !st.completed
+        });
+      });
+
+      allTasks.sort((a, b) => a.date.localeCompare(b.date));
+
+      const uncompletedCount = allTasks.filter(t => !t.completed).length;
+      document.getElementById('todo-badge').innerText = uncompletedCount;
+      document.getElementById('todo-summary').innerText = `残タスク: ${uncompletedCount}件`;
+
+      let filteredTasks = hideCompleted ? allTasks.filter(t => !t.completed) : allTasks;
+
+      if (filteredTasks.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl p-8 text-center border border-slate-200 shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-xl">
+              <i class="fa-solid fa-check"></i>
+            </div>
+            <h3 class="font-bold text-slate-800">残っているタスクはありません！</h3>
+            <p class="text-xs text-slate-500 mt-1">「完了タスクを隠す」のチェックを解除すると過去の履歴を確認できます。</p>
+          </div>
+        `;
+        return;
+      }
+
+      filteredTasks.forEach(item => {
+        const isToday = item.date === todayStr;
+
+        const card = document.createElement('div');
+        card.className = `bg-white rounded-xl p-3.5 border transition flex items-center justify-between gap-3 shadow-sm ${
+          item.completed ? 'opacity-50 bg-slate-50 border-slate-200' : item.isOverdue ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 hover:border-blue-300'
+        }`;
+
+        card.innerHTML = `
+          <div class="flex items-center space-x-3 flex-1 min-w-0">
+            <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleTaskStatus('${item.type}', '${item.id}', '${item.blockKey}')" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center space-x-2 flex-wrap gap-y-1 mb-0.5">
+                ${getBlockBadgeHTML(item.blockKey)}
+                <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">${escapeHTML(item.category)}</span>
+                <span class="text-xs font-bold text-slate-500">${formatDateJP(item.date)}</span>
+                ${isToday ? '<span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">今日</span>' : ''}
+                ${item.isOverdue ? '<span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">遅れ</span>' : ''}
+              </div>
+              <h4 class="font-bold text-sm text-slate-900 truncate ${item.completed ? 'line-through text-slate-500' : ''}">${escapeHTML(item.title)}</h4>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-1">
+            <button onclick="openShiftModal('${item.type}', '${item.id}', '${item.blockKey}')" class="px-2.5 py-1.5 text-xs text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition font-medium flex items-center">
+              <i class="fa-regular fa-calendar-minus mr-1"></i> ズラす
+            </button>
+            <button onclick="deleteSingleOrTask('${item.type}', '${item.id}', '${item.blockKey}')" class="p-1.5 text-slate-300 hover:text-red-500 rounded-lg" title="削除">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
     }
 
-    saveLocalData();
-    document.getElementById('task-title').value = '';
-  }
-
-  function toggleDone(id) {
-    const t = tasks.find(x => x.id === id);
-    if (t) {
-      t.done = !t.done;
-      saveLocalData();
-    }
-  }
-
-  function shiftTask(id, days) {
-    const target = tasks.find(x => x.id === id);
-    if (!target) return;
-
-    if (target.stage === 'single' || !target.cycleId) {
-      const d = new Date(target.date);
-      d.setDate(d.getDate() + days);
-      target.date = d.toISOString().split('T')[0];
-    } else {
-      const stages = ['A', 'B', 'C', 'D'];
-      const curIdx = stages.indexOf(target.stage);
-      const cycleTasks = tasks.filter(x => x.cycleId === target.cycleId);
-      
-      cycleTasks.forEach(t => {
-        const tIdx = stages.indexOf(t.stage);
-        if (tIdx >= curIdx && !t.done) {
-          const d = new Date(t.date);
-          d.setDate(d.getDate() + days);
-          t.date = d.toISOString().split('T')[0];
+    function toggleTaskStatus(type, id, blockKey) {
+      if (type === 'cycle') {
+        const lec = appData.lectures.find(l => l.id === id);
+        if (lec && lec.blocks[blockKey]) {
+          lec.blocks[blockKey].completed = !lec.blocks[blockKey].completed;
         }
+      } else {
+        const st = appData.otherTasks.find(t => t.id === id);
+        if (st) {
+          st.completed = !st.completed;
+        }
+      }
+      saveData();
+      renderCurrentView();
+    }
+
+    function deleteSingleOrTask(type, id, blockKey) {
+      if (type === 'other') {
+        appData.otherTasks = appData.otherTasks.filter(t => t.id !== id);
+        saveData();
+        renderCurrentView();
+      } else {
+        const lec = appData.lectures.find(l => l.id === id);
+        if (lec) {
+          delete lec.blocks[blockKey];
+          saveData();
+          renderCurrentView();
+        }
+      }
+    }
+
+    function renderCalendarView() {
+      const year = calendarCurrentDate.getFullYear();
+      const month = calendarCurrentDate.getMonth();
+      const hideCompleted = document.getElementById('hide-completed-toggle').checked;
+
+      document.getElementById('calendar-month-year').innerText = `${year}年 ${month + 1}月`;
+
+      const grid = document.getElementById('calendar-days-grid');
+      grid.innerHTML = '';
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      const todayStr = formatDateISO(new Date());
+
+      let calendarMap = {};
+
+      appData.lectures.forEach(lec => {
+        Object.keys(lec.blocks).forEach(key => {
+          const b = lec.blocks[key];
+          if (hideCompleted && b.completed) return;
+
+          if (!calendarMap[b.date]) calendarMap[b.date] = [];
+          calendarMap[b.date].push({
+            type: 'cycle',
+            id: lec.id,
+            title: lec.title,
+            key: key,
+            completed: b.completed
+          });
+        });
+      });
+
+      appData.otherTasks.forEach(st => {
+        if (hideCompleted && st.completed) return;
+
+        if (!calendarMap[st.date]) calendarMap[st.date] = [];
+        calendarMap[st.date].push({
+          type: 'other',
+          id: st.id,
+          title: st.title,
+          key: 'OTHER',
+          completed: st.completed
+        });
+      });
+
+      for (let i = 0; i < firstDay; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'min-h-[90px] p-1 bg-slate-50/50 text-slate-300 text-xs';
+        grid.appendChild(cell);
+      }
+
+      for (let day = 1; day <= lastDate; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        const tasks = calendarMap[dateStr] || [];
+
+        const cell = document.createElement('div');
+        cell.className = `min-h-[90px] p-1 border-t border-slate-100 transition ${isToday ? 'bg-blue-50/40' : ''}`;
+
+        let badgesHTML = tasks.map(t => {
+          let colorClass = 'bg-blue-600'; // A & その他
+          let label = t.key === 'OTHER' ? 'その他' : t.key;
+          if (t.key === 'B') colorClass = 'bg-emerald-600';
+          if (t.key === 'C') colorClass = 'bg-amber-600';
+          if (t.key === 'D') colorClass = 'bg-purple-600';
+
+          return `
+            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1 py-0.5 text-white font-medium mb-1 cursor-pointer ${colorClass} ${t.completed ? 'opacity-40 line-through' : 'hover:opacity-80'}">
+              ${label}: ${escapeHTML(t.title)}
+            </div>
+          `;
+        }).join('');
+
+        cell.innerHTML = `
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center' : 'text-slate-700'}">${day}</span>
+            ${tasks.length > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${tasks.length}</span>` : ''}
+          </div>
+          <div class="space-y-0.5 max-h-16 overflow-y-auto">${badgesHTML}</div>
+        `;
+
+        grid.appendChild(cell);
+      }
+    }
+
+    function changeCalendarMonth(delta) {
+      calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + delta);
+      renderCalendarView();
+    }
+
+    function resetCalendarToToday() {
+      calendarCurrentDate = new Date();
+      renderCalendarView();
+    }
+
+    /* Lectures Manager View */
+    function renderLecturesView() {
+      const container = document.getElementById('lecture-cards-container');
+      container.innerHTML = '';
+
+      if (appData.lectures.length === 0) {
+        container.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8">登録された講義サイクルがありません。</p>';
+        return;
+      }
+
+      appData.lectures.forEach(lec => {
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4';
+
+        let blocksHTML = ['A', 'B', 'C', 'D'].map(k => {
+          const b = lec.blocks[k];
+          if (!b) return '';
+          return `
+            <div class="flex items-center justify-between text-xs py-2 border-b border-slate-100 last:border-0">
+              <div class="flex items-center space-x-2">
+                ${getBlockBadgeHTML(k)}
+                <span class="font-semibold text-slate-700">${formatDateJP(b.date)}</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                ${b.completed ? '<span class="text-emerald-600 font-bold"><i class="fa-solid fa-check"></i> 完了</span>' : '<span class="text-slate-400">未処理</span>'}
+                <button onclick="openShiftModal('cycle', '${lec.id}', '${k}')" class="text-blue-600 hover:underline">ズレ修正</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        card.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold mb-1 inline-block">${escapeHTML(lec.category)}</span>
+              <h3 class="font-bold text-slate-900 text-base">${escapeHTML(lec.title)}</h3>
+            </div>
+            <button onclick="deleteLectureCycle('${lec.id}')" class="text-slate-300 hover:text-red-500 p-1"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+          <div class="bg-slate-50 rounded-xl p-3 space-y-1">${blocksHTML}</div>
+        `;
+
+        container.appendChild(card);
       });
     }
 
-    saveLocalData();
-  }
-
-  function deleteTask(id) {
-    if (confirm("このタスクを削除しますか？")) {
-      tasks = tasks.filter(x => x.id !== id);
-      saveLocalData();
-    }
-  }
-
-  function render() {
-    renderCalendar();
-    renderTodoList();
-  }
-
-  function renderTodoList() {
-    const listEl = document.getElementById('todo-list');
-    listEl.innerHTML = '';
-
-    const sorted = [...tasks].sort((a, b) => a.date.localeCompare(b.date));
-
-    if (sorted.length === 0) {
-      listEl.innerHTML = '<p style="color:#888; padding:8px;">タスクはありません。</p>';
-      return;
+    function deleteLectureCycle(id) {
+      appData.lectures = appData.lectures.filter(l => l.id !== id);
+      saveData();
+      renderCurrentView();
     }
 
-    sorted.forEach(t => {
-      const item = document.createElement('div');
-      item.className = 'todo-item' + (t.done ? ' done' : '');
-
-      let stageClass = 'type-A';
-      if (t.stage === 'B') stageClass = 'type-B';
-      if (t.stage === 'C') stageClass = 'type-C';
-      if (t.stage === 'D') stageClass = 'type-D';
-
-      item.innerHTML = `
-        <div class="todo-left">
-          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDone('${t.id}')">
-          <span class="badge ${stageClass}">${t.stage === 'single' ? 'その他' : t.stage}</span>
-          <small style="color:#666;">${t.date}</small>
-          <span>${t.title}</span>
-        </div>
-        <div class="shift-btns">
-          <button class="btn btn-sm" style="background:#6c757d;" onclick="shiftTask('${t.id}', -1)">-1日</button>
-          <button class="btn btn-sm" style="background:#6c757d;" onclick="shiftTask('${t.id}', 1)">+1日</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">✕</button>
-        </div>
-      `;
-      listEl.appendChild(item);
-    });
-  }
-
-  function moveMonth(dir) {
-    currentDate.setMonth(currentDate.getMonth() + dir);
-    renderCalendar();
-  }
-
-  function renderCalendar() {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-
-    document.getElementById('cal-month-title').innerText = `${year}年 ${month + 1}月`;
-
-    const grid = document.getElementById('cal-grid');
-    grid.innerHTML = '';
-
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    days.forEach(d => {
-      grid.innerHTML += `<div class="cal-day-head">${d}</div>`;
-    });
-
-    const firstDay = new Date(year, month, 1).getDay();
-    const lastDate = new Date(year, month + 1, 0).getDate();
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    for (let i = 0; i < firstDay; i++) {
-      grid.innerHTML += `<div class="cal-cell" style="background:#f0f0f0;"></div>`;
+    /* Modal Form Submissions */
+    function openNewLectureModal() {
+      document.getElementById('form-lecture').reset();
+      document.getElementById('input-date').value = formatDateISO(new Date());
+      openModal('modal-lecture');
     }
 
-    for (let date = 1; date <= lastDate; date++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-      const isToday = (dateStr === todayStr);
+    function saveNewLecture(e) {
+      e.preventDefault();
+      const title = document.getElementById('input-title').value.trim();
+      const category = document.getElementById('input-category').value.trim() || '講義';
+      const startDate = document.getElementById('input-date').value;
 
-      const dayTasks = tasks.filter(x => x.date === dateStr && !x.done);
+      if (!title || !startDate) return;
 
-      let taskHtml = '';
-      dayTasks.forEach(t => {
-        let stageClass = 'type-A';
-        if (t.stage === 'B') stageClass = 'type-B';
-        if (t.stage === 'C') stageClass = 'type-C';
-        if (t.stage === 'D') stageClass = 'type-D';
-        taskHtml += `<span class="badge ${stageClass}" title="${t.title}">${t.title}</span>`;
+      const newLec = createLectureCycle(title, category, startDate);
+      appData.lectures.unshift(newLec);
+      saveData();
+
+      closeModal('modal-lecture');
+      renderCurrentView();
+      showToast('講義サイクルを登録しました');
+    }
+
+    function openNewOtherModal() {
+      document.getElementById('form-other').reset();
+      document.getElementById('input-other-date').value = formatDateISO(new Date());
+      openModal('modal-other');
+    }
+
+    function saveNewOtherTask(e) {
+      e.preventDefault();
+      const title = document.getElementById('input-other-title').value.trim();
+      const date = document.getElementById('input-other-date').value;
+
+      if (!title || !date) return;
+
+      appData.otherTasks.unshift({
+        id: generateId(),
+        title: title,
+        category: 'その他',
+        date: date,
+        completed: false
       });
 
-      grid.innerHTML += `
-        <div class="cal-cell ${isToday ? 'today' : ''}">
-          <div class="cal-date">${date}</div>
-          ${taskHtml}
-        </div>
-      `;
+      saveData();
+      closeModal('modal-other');
+      renderCurrentView();
+      showToast('単体タスクを追加しました');
     }
-  }
 
-  // 初期読み込み
-  loadLocalData();
-</script>
+    function openShiftModal(type, id, blockKey) {
+      activeShiftContext = { type, id, key: blockKey };
 
+      if (type === 'cycle') {
+        const lec = appData.lectures.find(l => l.id === id);
+        if (!lec) return;
+        const b = lec.blocks[blockKey];
+        activeShiftContext.oldDate = b.date;
+
+        document.getElementById('modal-shift-info').innerHTML = `
+          <div class="font-bold text-slate-900">${escapeHTML(lec.title)}</div>
+          <div class="text-xs text-blue-800 mt-1">対象ステップ: ${getBlockBadgeHTML(blockKey)} (現在: ${formatDateJP(b.date)})</div>
+        `;
+        document.getElementById('shift-cascade-warning').classList.remove('hidden');
+        document.getElementById('input-shift-date').value = b.date;
+      } else {
+        const st = appData.otherTasks.find(t => t.id === id);
+        if (!st) return;
+        activeShiftContext.oldDate = st.date;
+
+        document.getElementById('modal-shift-info').innerHTML = `
+          <div class="font-bold text-slate-900">${escapeHTML(st.title)}</div>
+          <div class="text-xs text-blue-800 mt-1">その他 (単体タスク) (現在: ${formatDateJP(st.date)})</div>
+        `;
+        document.getElementById('shift-cascade-warning').classList.add('hidden');
+        document.getElementById('input-shift-date').value = st.date;
+      }
+
+      openModal('modal-shift');
+    }
+
+    function shiftQuickOffset(days) {
+      const current = document.getElementById('input-shift-date').value || activeShiftContext.oldDate;
+      document.getElementById('input-shift-date').value = addDays(current, days);
+    }
+
+    function saveShiftAction() {
+      const newDate = document.getElementById('input-shift-date').value;
+      if (!newDate) return;
+
+      if (activeShiftContext.type === 'cycle') {
+        shiftCycleBlockDate(activeShiftContext.id, activeShiftContext.key, newDate);
+      } else {
+        const st = appData.otherTasks.find(t => t.id === activeShiftContext.id);
+        if (st) st.date = newDate;
+        saveData();
+      }
+
+      closeModal('modal-shift');
+      renderCurrentView();
+      showToast('日程の調整を適用しました');
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function getBlockBadgeHTML(key) {
+      if (key === 'A') return '<span class="bg-blue-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">A:講義</span>';
+      if (key === 'B') return '<span class="bg-emerald-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">B:1回目</span>';
+      if (key === 'C') return '<span class="bg-amber-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">C:2回目</span>';
+      if (key === 'D') return '<span class="bg-purple-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">D:3回目</span>';
+      if (key === 'OTHER') return '<span class="bg-blue-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">その他</span>';
+      return '';
+    }
+
+    function escapeHTML(str) {
+      if (!str) return '';
+      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+  </script>
 </body>
 </html>
