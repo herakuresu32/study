@@ -33,22 +33,22 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 💡 ご自身のFirebaseプロジェクトの設定値に書き換えることで、ご専用のクラウドストレージになります
-    // (現在はデモ用共有DBに接続する設定にしています)
+    // 💡 あなたのFirebaseプロジェクト（study-f5782）の設定を適用済みです
     const firebaseConfig = {
-      apiKey: "AIzaSyDemoKeyForForgettingCurveApp12345",
-      authDomain: "forgetting-curve-app.firebaseapp.com",
-      projectId: "forgetting-curve-app",
-      storageBucket: "forgetting-curve-app.appspot.com",
-      messagingSenderId: "1234567890",
-      appId: "1:1234567890:web:abcdef123456"
+      apiKey: "AIzaSyDEJn3BPHLWjdKDS5cTeNIb5co4Fizuc4c",
+      authDomain: "study-f5782.firebaseapp.com",
+      projectId: "study-f5782",
+      storageBucket: "study-f5782.firebasestorage.app",
+      messagingSenderId: "180062362077",
+      appId: "1:180062362077:web:d6a4d384a88e2a6bddbe34",
+      measurementId: "G-KMN0MVL4QE"
     };
 
     // Firebaseの初期化
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // 同期用の固定ドキュメントID (※複数人で部屋分けしたい場合はここを変更)
+    // 全端末で共通利用するドキュメント参照
     const docRef = doc(db, "study_schedules", "shared_user_schedule");
 
     window.FirebaseDB = {
