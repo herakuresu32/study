@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>復習・学習スケジュール管理（リアルタイム同期版）</title>
-  <!-- Firebase SDK (無料のリアルタイムデータベース) -->
+  <title>復習・学習スケジュール管理（安定同期版）</title>
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
@@ -12,8 +12,8 @@
     body { background: #f0f2f5; margin: 0; padding: 12px; color: #333; }
     .container { max-width: 900px; margin: 0 auto; }
     .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    h2, h3 { margin-top: 0; color: #1a73e8; }
-    .sync-bar { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 8px 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.9rem; }
+    h3 { margin-top: 0; color: #1a73e8; }
+    .sync-bar { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 10px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.9rem; flex-wrap: wrap; gap: 8px; }
     .btn { background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
     .btn-danger { background: #d93025; }
     .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
@@ -27,17 +27,17 @@
     .cal-cell.today { background: #e8f0fe; border-color: #1a73e8; }
     .cal-date { font-weight: bold; padding: 2px 4px; color: #555; }
 
-    /* バッジカラー */
-    .badge { display: block; padding: 2px 4px; border-radius: 4px; color: white; font-size: 0.7rem; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* バッジ */
+    .badge { display: block; padding: 2px 4px; border-radius: 4px; color: white; font-size: 0.75rem; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .type-A { background: #4285f4; } /* 講義 / その他 */
     .type-B { background: #34a853; } /* 復習1 */
     .type-C { background: #fbbc05; color: #000; } /* 復習2 */
     .type-D { background: #ea4335; } /* 復習3 */
 
     /* ToDo リスト */
-    .todo-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
-    .todo-item.done span { text-decoration: line-through; color: #888; }
-    .todo-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .todo-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; gap: 8px; }
+    .todo-item.done span { text-decoration: line-through; color: #a0a0a0; }
+    .todo-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
     .shift-btns { display: flex; gap: 4px; }
   </style>
 </head>
@@ -48,17 +48,17 @@
   <!-- 同期設定バー -->
   <div class="sync-bar">
     <div>
-      🌐 同期ID: <strong id="current-group-id">未設定</strong>
-      <span id="sync-status" style="color:#34a853; font-weight:bold; margin-left:8px;">● 接続中</span>
+      🔑 共通あい言葉（同期ID）: <strong id="current-group-id" style="color:#1a73e8;">未設定</strong>
+      <span id="sync-status" style="font-weight:bold; margin-left:12px;">● 接続確認中</span>
     </div>
-    <button class="btn btn-sm" onclick="changeGroupId()">同期ID変更</button>
+    <button class="btn btn-sm" onclick="changeGroupId()">あい言葉を変更</button>
   </div>
 
   <!-- タスク追加フォーム -->
   <div class="card">
     <h3>📝 タスクの追加</h3>
     <div>
-      <input type="text" id="task-title" placeholder="タイトル（例: 簿記 第1講）" style="width: 200px;">
+      <input type="text" id="task-title" placeholder="タイトル（例: 簿記 第1講）" style="width: 220px;">
       <select id="task-type">
         <option value="cycle">【連動サイクル】講義 + 3回復習（A→B→C→D）</option>
         <option value="single">【その他】単体タスク（Aと同じ青色）</option>
@@ -87,52 +87,61 @@
 </div>
 
 <script>
-  // Firebase設定（パブリック用リアルタイムDB）
+  // Firebase設定（リアルタイムデータベース）
   const firebaseConfig = {
     databaseURL: "https://study-sync-default-rtdb.asia-southeast1.firebasedatabase.app/"
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  let groupId = localStorage.getItem('study_group_id');
-  if (!groupId) {
-    groupId = 'group-' + Math.floor(100000 + Math.random() * 900000);
-    localStorage.setItem('study_group_id', groupId);
-  }
+  // デフォルトの共通あい言葉（初期設定）
+  let groupId = localStorage.getItem('study_group_id_fixed') || 'my-study-group-2026';
+  localStorage.setItem('study_group_id_fixed', groupId);
   document.getElementById('current-group-id').innerText = groupId;
-
-  function changeGroupId() {
-    const input = prompt("共有・同期したい「同じ同期ID（合い言葉）」を入力してください:", groupId);
-    if (input && input.trim() !== "") {
-      groupId = input.trim();
-      localStorage.setItem('study_group_id', groupId);
-      document.getElementById('current-group-id').innerText = groupId;
-      listenData();
-    }
-  }
 
   let tasks = [];
   let currentDate = new Date();
+  let dbRef = null;
 
-  // デフォルトの日付に今日をセット
+  // 今日の日付を初期セット
   document.getElementById('task-date').valueAsDate = new Date();
 
-  // リアルタイムリスナー設定
-  function listenData() {
-    document.getElementById('sync-status').innerText = '⏳ 読み込み中...';
+  function changeGroupId() {
+    const input = prompt("PCとスマホで同じ「あい言葉（半角英数字）」を入力してください:", groupId);
+    if (input && input.trim() !== "") {
+      groupId = input.trim();
+      localStorage.setItem('study_group_id_fixed', groupId);
+      document.getElementById('current-group-id').innerText = groupId;
+      initSync();
+    }
+  }
+
+  function initSync() {
+    document.getElementById('sync-status').innerText = '⏳ 接続中...';
     document.getElementById('sync-status').style.color = '#fbbc05';
 
-    db.ref('tasks/' + groupId).on('value', (snapshot) => {
+    // 以前のリスナー解除
+    if (dbRef) dbRef.off();
+
+    dbRef = db.ref('groups/' + groupId);
+
+    // クラウドからデータを受信
+    dbRef.on('value', (snapshot) => {
       const data = snapshot.val();
-      tasks = data ? Object.values(data) : [];
+      tasks = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       document.getElementById('sync-status').innerText = '● 同期完了';
       document.getElementById('sync-status').style.color = '#34a853';
       render();
+    }, (error) => {
+      document.getElementById('sync-status').innerText = '✖ 通信エラー';
+      document.getElementById('sync-status').style.color = '#d93025';
     });
   }
 
   function saveData() {
-    db.ref('tasks/' + groupId).set(tasks);
+    if (dbRef) {
+      dbRef.set(tasks);
+    }
   }
 
   // タスク追加
@@ -147,18 +156,18 @@
     }
 
     const baseDate = new Date(dateStr);
-    const cycleId = 'cycle-' + Date.now();
+    const cycleId = 'c-' + Date.now();
 
     if (type === 'single') {
       tasks.push({
-        id: 't-' + Date.now(),
+        id: 't-' + Date.now() + '-' + Math.floor(Math.random()*1000),
         title: title,
         date: dateStr,
-        stage: 'single', // その他
+        stage: 'single',
         done: false
       });
     } else {
-      // 連動サイクル (A: 1日目, B: 2日目[+1d], C: 5日目[+4d], D: 14日目[+13d])
+      // サイクル (A: 1日目, B: 2日目[+1d], C: 5日目[+4d], D: 14日目[+13d])
       const offsets = [
         { stage: 'A', offset: 0, label: '【講義】' },
         { stage: 'B', offset: 1, label: '【復習1】' },
@@ -166,11 +175,11 @@
         { stage: 'D', offset: 13, label: '【復習3】' }
       ];
 
-      offsets.forEach(opt => {
+      offsets.forEach((opt, idx) => {
         const d = new Date(baseDate);
         d.setDate(d.getDate() + opt.offset);
         tasks.push({
-          id: 't-' + Date.now() + '-' + opt.stage,
+          id: 't-' + Date.now() + '-' + idx,
           cycleId: cycleId,
           title: opt.label + title,
           date: d.toISOString().split('T')[0],
@@ -184,7 +193,7 @@
     document.getElementById('task-title').value = '';
   }
 
-  // チェック切り替え（完了したら表示消去/チェック）
+  // 完了トグル
   function toggleDone(id) {
     const t = tasks.find(x => x.id === id);
     if (t) {
@@ -193,21 +202,18 @@
     }
   }
 
-  // 日付のシフト（連動移動）
+  // 日付連動シフト
   function shiftTask(id, days) {
     const target = tasks.find(x => x.id === id);
     if (!target) return;
 
     if (target.stage === 'single' || !target.cycleId) {
-      // 単体移動
       const d = new Date(target.date);
       d.setDate(d.getDate() + days);
       target.date = d.toISOString().split('T')[0];
     } else {
-      // サイクル連動移動 (未消化の後続タスクを連動)
       const stages = ['A', 'B', 'C', 'D'];
       const curIdx = stages.indexOf(target.stage);
-      
       const cycleTasks = tasks.filter(x => x.cycleId === target.cycleId);
       
       cycleTasks.forEach(t => {
@@ -230,7 +236,6 @@
     }
   }
 
-  // 画面描画
   function render() {
     renderCalendar();
     renderTodoList();
@@ -240,11 +245,10 @@
     const listEl = document.getElementById('todo-list');
     listEl.innerHTML = '';
 
-    // 日付順ソート
     const sorted = [...tasks].sort((a, b) => a.date.localeCompare(b.date));
 
     if (sorted.length === 0) {
-      listEl.innerHTML = '<p style="color:#888;">登録されているタスクはありません。</p>';
+      listEl.innerHTML = '<p style="color:#888; padding:8px;">登録されているタスクはありません。</p>';
       return;
     }
 
@@ -259,7 +263,7 @@
 
       item.innerHTML = `
         <div class="todo-left">
-          <input type="checkbox" ${t.done ? 'checked' : ''} onclick="toggleDone('${t.id}')">
+          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDone('${t.id}')">
           <span class="badge ${stageClass}">${t.stage === 'single' ? 'その他' : t.stage}</span>
           <small style="color:#666;">${t.date}</small>
           <span>${t.title}</span>
@@ -325,8 +329,8 @@
     }
   }
 
-  // 初期化実行
-  listenData();
+  // 初回接続開始
+  initSync();
 </script>
 
 </body>
