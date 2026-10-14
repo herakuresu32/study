@@ -13,12 +13,10 @@
       theme: {
         extend: {
           colors: {
-            typeA: '#2563eb',
-            typeB: '#059669',
-            typeC: '#d97706',
-            typeD: '#7c3aed',
-            appDark: '#1e293b',
-            cardBlue: '#3b82f6',
+            typeA: '#2563eb', // A: 講義 / その他 (青)
+            typeB: '#059669', // B: 1回目 (緑)
+            typeC: '#d97706', // C: 2回目 (オレンジ)
+            typeD: '#7c3aed', // D: 3回目 (紫)
           }
         }
       }
@@ -122,28 +120,43 @@
         </button>
       </div>
 
-      <label class="flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
-        <input type="checkbox" id="hide-completed-toggle" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-0">
-        <span>完了を隠す</span>
+      <!-- ToDo用のトグル -->
+      <label id="toggle-container-todo" class="flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+        <input type="checkbox" id="hide-completed-todo" onchange="renderCurrentView()" checked class="rounded text-blue-600 focus:ring-0">
+        <span>ToDo: 完了を隠す</span>
+      </label>
+
+      <!-- カレンダー用のトグル -->
+      <label id="toggle-container-calendar" class="hidden flex items-center space-x-2 cursor-pointer text-xs text-slate-300 bg-slate-800 px-3 py-2 rounded-xl">
+        <input type="checkbox" id="hide-completed-calendar" onchange="renderCurrentView()" class="rounded text-blue-600 focus:ring-0">
+        <span>カレンダー: 完了を隠す</span>
       </label>
     </div>
 
-    <!-- VIEW: TODO LIST (画像イメージ風UI) -->
+    <!-- VIEW: TODO LIST (日付グループ化UI) -->
     <section id="view-todo" class="space-y-6">
       <div id="todo-groups-container" class="space-y-6">
-        <!-- JSで日付ごとにグループ化描画 -->
+        <!-- JSで描画 -->
       </div>
     </section>
 
     <!-- VIEW: CALENDAR -->
     <section id="view-calendar" class="hidden space-y-4">
       <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div class="flex items-center space-x-2">
             <h2 id="calendar-month-year" class="text-base font-bold text-white">--年 --月</h2>
             <button onclick="changeCalendarMonth(-1)" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i class="fa-solid fa-chevron-left"></i></button>
             <button onclick="resetCalendarToToday()" class="text-xs px-2 py-0.5 bg-slate-800 text-slate-300 rounded">今日</button>
             <button onclick="changeCalendarMonth(1)" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+
+          <!-- 色の凡例 -->
+          <div class="flex items-center space-x-3 text-[11px] text-slate-300 flex-wrap gap-y-1">
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 mr-1"></span> 講義/その他</span>
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600 mr-1"></span> 1回目</span>
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-600 mr-1"></span> 2回目</span>
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-purple-600 mr-1"></span> 3回目</span>
           </div>
         </div>
 
@@ -295,7 +308,7 @@
       if (window.FirebaseDB) window.FirebaseDB.save(appData);
     }
 
-    /* 日付関連ユーティリティ */
+    /* 日付ユーティリティ */
     function formatDateISO(d) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -339,7 +352,7 @@
         title: title,
         category: category || "講義",
         blocks: {
-          A: { key: 'A', label: '【A】受講', date: startDateStr, completed: false },
+          A: { key: 'A', label: '【A】講義', date: startDateStr, completed: false },
           B: { key: 'B', label: '【B】1回目', date: addDays(startDateStr, 1), completed: false },
           C: { key: 'C', label: '【C】2回目', date: addDays(startDateStr, 4), completed: false },
           D: { key: 'D', label: '【D】3回目', date: addDays(startDateStr, 13), completed: false }
@@ -367,8 +380,18 @@
       saveLocalData();
     }
 
+    /* タイプ別のカラー取得関数 */
+    function getTaskColorClass(blockKey) {
+      if (blockKey === 'B') return 'bg-emerald-600 hover:bg-emerald-500';
+      if (blockKey === 'C') return 'bg-amber-600 hover:bg-amber-500';
+      if (blockKey === 'D') return 'bg-purple-600 hover:bg-purple-500';
+      return 'bg-blue-600 hover:bg-blue-500'; // A(講義) および その他
+    }
+
     function switchTab(tab) {
       currentViewTab = tab;
+
+      // タブごとの切り替え
       ['todo', 'calendar', 'lectures'].forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         const view = document.getElementById(`view-${t}`);
@@ -380,6 +403,22 @@
           view.classList.add('hidden');
         }
       });
+
+      // トグルの表示切り替え（ToDo用/カレンダー用）
+      const toggleTodo = document.getElementById('toggle-container-todo');
+      const toggleCal = document.getElementById('toggle-container-calendar');
+
+      if (tab === 'todo') {
+        toggleTodo.classList.remove('hidden');
+        toggleCal.classList.add('hidden');
+      } else if (tab === 'calendar') {
+        toggleTodo.classList.add('hidden');
+        toggleCal.classList.remove('hidden');
+      } else {
+        toggleTodo.classList.add('hidden');
+        toggleCal.classList.add('hidden');
+      }
+
       renderCurrentView();
     }
 
@@ -389,10 +428,10 @@
       if (currentViewTab === 'lectures') renderLecturesView();
     }
 
-    /* VIEW: TODO (画像のようなデザイン) */
+    /* VIEW: TODO (日付グループ化UI) */
     function renderToDoView() {
       const container = document.getElementById('todo-groups-container');
-      const hideCompleted = document.getElementById('hide-completed-toggle').checked;
+      const hideCompleted = document.getElementById('hide-completed-todo').checked;
       const todayStr = formatDateISO(new Date());
 
       container.innerHTML = '';
@@ -466,7 +505,6 @@
 
         const cardsContainer = groupEl.querySelector('.drop-zone');
 
-        // ドラッグオーバー処理
         cardsContainer.addEventListener('dragover', (e) => {
           e.preventDefault();
           cardsContainer.classList.add('drag-over');
@@ -483,15 +521,17 @@
         });
 
         grouped[dateStr].forEach(task => {
+          const colorClass = getTaskColorClass(task.blockKey);
+
           const card = document.createElement('div');
           card.draggable = true;
-          card.className = `task-card bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-3 rounded-full flex items-center justify-between shadow ${
+          card.className = `task-card ${colorClass} text-white font-semibold px-4 py-3 rounded-full flex items-center justify-between shadow ${
             task.completed ? 'opacity-40 bg-slate-800 text-slate-400' : ''
           }`;
 
           card.innerHTML = `
             <div class="flex items-center space-x-3 truncate flex-1 cursor-pointer" onclick="toggleTaskStatus('${task.type}', '${task.id}', '${task.blockKey}')">
-              <div class="w-5 h-5 rounded-full border-2 border-white/80 flex items-center justify-center text-xs flex-shrink-0 ${task.completed ? 'bg-white text-blue-600 border-white' : ''}">
+              <div class="w-5 h-5 rounded-full border-2 border-white/80 flex items-center justify-center text-xs flex-shrink-0 ${task.completed ? 'bg-white text-slate-900 border-white' : ''}">
                 ${task.completed ? '<i class="fa-solid fa-check"></i>' : ''}
               </div>
               <span class="truncate text-sm tracking-wide">
@@ -504,13 +544,8 @@
             </button>
           `;
 
-          // ドラッグイベント
-          card.addEventListener('dragstart', () => {
-            draggedTask = task;
-          });
-          card.addEventListener('dragend', () => {
-            draggedTask = null;
-          });
+          card.addEventListener('dragstart', () => { draggedTask = task; });
+          card.addEventListener('dragend', () => { draggedTask = null; });
 
           cardsContainer.appendChild(card);
         });
@@ -547,7 +582,7 @@
     function renderCalendarView() {
       const year = calendarCurrentDate.getFullYear();
       const month = calendarCurrentDate.getMonth();
-      const hideCompleted = document.getElementById('hide-completed-toggle').checked;
+      const hideCompleted = document.getElementById('hide-completed-calendar').checked;
 
       document.getElementById('calendar-month-year').innerText = `${year}年 ${month + 1}月`;
       const grid = document.getElementById('calendar-days-grid');
@@ -597,11 +632,14 @@
           if (draggedTask) handleTaskDrop(draggedTask, dateStr);
         });
 
-        let badgesHTML = tasks.map(t => `
-          <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white bg-blue-600 mb-1 cursor-pointer hover:bg-blue-500 ${t.completed ? 'opacity-40 line-through' : ''}">
-            ${escapeHTML(t.title)}
-          </div>
-        `).join('');
+        let badgesHTML = tasks.map(t => {
+          const colorClass = getTaskColorClass(t.key);
+          return `
+            <div onclick="openShiftModal('${t.type}', '${t.id}', '${t.key}')" class="text-[10px] truncate rounded px-1.5 py-0.5 text-white ${colorClass} mb-1 cursor-pointer ${t.completed ? 'opacity-40 line-through' : ''}">
+              ${escapeHTML(t.title)}
+            </div>
+          `;
+        }).join('');
 
         cell.innerHTML = `
           <div class="flex justify-between items-center mb-1">
