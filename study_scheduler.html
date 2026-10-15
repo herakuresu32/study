@@ -93,6 +93,10 @@
       </div>
 
       <div class="flex items-center space-x-2">
+        <!-- Google ToDo 送信ボタン -->
+        <button onclick="syncToGoogleTasks()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition shadow-sm">
+          <i class="fa-solid fa-rotate mr-1"></i> Google ToDoへ同期
+        </button>
         <button onclick="openNewOtherModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition border border-slate-200">
           <i class="fa-solid fa-plus mr-1 text-blue-600"></i> タスク
         </button>
@@ -108,7 +112,6 @@
 
     <!-- ビュー切り替え ＆ コントロール -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <!-- 順番を元の「ToDo -> カレンダー -> 講義一覧」に復元 -->
       <div class="flex bg-slate-200/80 p-1 rounded-xl text-xs font-semibold">
         <button id="tab-todo" onclick="switchTab('todo')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm">
           <i class="fa-solid fa-list-check mr-1.5 text-blue-600"></i>ToDoリスト
@@ -265,17 +268,19 @@
   </div>
 
   <script>
+    // デプロイされたGASのウェブアプリURLが埋め込み済みです
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwraFGjtzta1M37gh7tfRFGcYR1YYKFJs_nSaxr39NjOfy4DN3QMrsIKgjgO4eBPH8wTA/exec";
+
     const LOCAL_STORAGE_KEY = 'forgetting_curve_hybrid_v1';
     let appData = { lectures: [], otherTasks: [] };
     let calendarCurrentDate = new Date();
-    let currentViewTab = 'todo'; // デフォルト表示をToDoリストに戻す
+    let currentViewTab = 'todo';
     let activeShiftContext = { type: 'cycle', id: null, key: null, oldDate: null };
     let draggedTask = null;
 
     window.addEventListener('DOMContentLoaded', () => {
       loadLocalData();
 
-      // URLハッシュ（#todo, #calendar, #lectures）の判定（指定があればそちらを優先）
       const hash = window.location.hash.replace('#', '');
       if (['todo', 'calendar', 'lectures'].includes(hash)) {
         currentViewTab = hash;
@@ -321,6 +326,91 @@
 
     function syncDataToCloud() {
       if (window.FirebaseDB) window.FirebaseDB.save(appData);
+    }
+
+    /* Google ToDo リスト（Google Tasks）双方向同期処理 */
+    async function syncToGoogleTasks() {
+      if (!GAS_WEB_APP_URL) {
+        alert("GASのウェブアプリURLが設定されていません。");
+        return;
+      }
+
+      let exportTasks = [];
+
+      // 1. 講義サイクルのブロックを単体タスクへ展開
+      appData.lectures.forEach(lec => {
+        Object.keys(lec.blocks).forEach(key => {
+          const b = lec.blocks[key];
+          exportTasks.push({
+            title: `${lec.title} - ${b.label}`,
+            category: lec.category,
+            date: b.date,
+            completed: b.completed
+          });
+        });
+      });
+
+      // 2. 単体タスクを展開
+      appData.otherTasks.forEach(st => {
+        exportTasks.push({
+          title: st.title,
+          category: st.category || 'その他',
+          date: st.date,
+          completed: st.completed
+        });
+      });
+
+      try {
+        const syncBadge = document.getElementById('sync-status-badge');
+        syncBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-500 animate-ping mr-1"></span> 双方向同期中...`;
+
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ tasks: exportTasks })
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          // 3. Google ToDo側の最新状態（完了/存在）をHTML側に反映
+          const googleTaskMap = new Map();
+          result.googleTasks.forEach(gt => googleTaskMap.set(gt.title, gt));
+
+          // 講義サイクルの同期
+          appData.lectures.forEach(lec => {
+            Object.keys(lec.blocks).forEach(key => {
+              const b = lec.blocks[key];
+              const fullTitle = lec.category ? `[${lec.category}] ${lec.title} - ${b.label}` : `${lec.title} - ${b.label}`;
+              const gTask = googleTaskMap.get(fullTitle);
+              if (gTask) {
+                b.completed = gTask.completed; // Google側の完了状態を反映
+              }
+            });
+          });
+
+          // 単体タスクの同期
+          appData.otherTasks.forEach(st => {
+            const fullTitle = st.category ? `[${st.category}] ${st.title}` : st.title;
+            const gTask = googleTaskMap.get(fullTitle);
+            if (gTask) {
+              st.completed = gTask.completed; // Google側の完了状態を反映
+            }
+          });
+
+          saveLocalData();
+          renderCurrentView();
+          alert("Google ToDo リストとの双方向同期が完了しました！");
+        } else {
+          alert("エラーが発生しました: " + result.message);
+        }
+
+        updateSyncStatus(true);
+      } catch (err) {
+        console.error("GAS連携エラー:", err);
+        alert("Google ToDo リストとの通信に失敗しました。");
+        updateSyncStatus(true);
+      }
     }
 
     /* 日付ユーティリティ */
@@ -407,7 +497,6 @@
       currentViewTab = tab;
       window.location.hash = tab;
 
-      // タブごとの切り替え
       ['todo', 'calendar', 'lectures'].forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         const view = document.getElementById(`view-${t}`);
@@ -420,7 +509,6 @@
         }
       });
 
-      // トグルの表示切り替え
       const toggleTodo = document.getElementById('toggle-container-todo');
       const toggleCal = document.getElementById('toggle-container-calendar');
       const toggleLec = document.getElementById('toggle-container-lectures');
