@@ -93,10 +93,6 @@
       </div>
 
       <div class="flex items-center space-x-2">
-        <!-- Google ToDo 送信ボタン -->
-        <button onclick="syncToGoogleTasks()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition shadow-sm">
-          <i class="fa-solid fa-rotate mr-1"></i> Google ToDoへ同期
-        </button>
         <button onclick="openNewOtherModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full font-medium text-xs flex items-center transition border border-slate-200">
           <i class="fa-solid fa-plus mr-1 text-blue-600"></i> タスク
         </button>
@@ -268,7 +264,6 @@
   </div>
 
   <script>
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwraFGjtzta1M37gh7tfRFGcYR1YYKFJs_nSaxr39NjOfy4DN3QMrsIKgjgO4eBPH8wTA/exec";
     const LOCAL_STORAGE_KEY = 'forgetting_curve_hybrid_v1';
     let appData = { lectures: [], otherTasks: [] };
     let calendarCurrentDate = new Date();
@@ -288,12 +283,17 @@
       if (window.FirebaseDB) {
         window.FirebaseDB.subscribe((cloudData) => {
           if (cloudData) {
-            appData = cloudData;
+            appData = {
+              lectures: Array.isArray(cloudData.lectures) ? cloudData.lectures : [],
+              otherTasks: Array.isArray(cloudData.otherTasks) ? cloudData.otherTasks : []
+            };
             saveLocalData(false);
             renderCurrentView();
             window.updateSyncStatus(true);
           } else {
-            syncDataToCloud();
+            // クラウドにデータが存在しない場合、空データによる誤上書きを防止
+            window.updateSyncStatus(true);
+            console.log("クラウドは初期状態です。新規データを追加すると自動保存されます。");
           }
         });
       }
@@ -313,7 +313,13 @@
     function loadLocalData() {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
-        try { appData = JSON.parse(stored); } catch (e) { console.error(e); }
+        try {
+          const parsed = JSON.parse(stored);
+          appData = {
+            lectures: Array.isArray(parsed.lectures) ? parsed.lectures : [],
+            otherTasks: Array.isArray(parsed.otherTasks) ? parsed.otherTasks : []
+          };
+        } catch (e) { console.error(e); }
       }
     }
 
@@ -324,90 +330,6 @@
 
     function syncDataToCloud() {
       if (window.FirebaseDB) window.FirebaseDB.save(appData);
-    }
-
-    /* Google ToDo リスト（Google Tasks）双方向同期処理 */
-    async function syncToGoogleTasks() {
-      if (!GAS_WEB_APP_URL) {
-        alert("GASのウェブアプリURLが設定されていません。");
-        return;
-      }
-
-      let exportTasks = [];
-
-      // 1. 講義サイクルのブロックを単体タスクへ展開
-      appData.lectures.forEach(lec => {
-        Object.keys(lec.blocks).forEach(key => {
-          const b = lec.blocks[key];
-          exportTasks.push({
-            title: `${lec.title} - ${b.label}`,
-            category: lec.category,
-            date: b.date,
-            completed: b.completed
-          });
-        });
-      });
-
-      // 2. 単体タスクを展開
-      appData.otherTasks.forEach(st => {
-        exportTasks.push({
-          title: st.title,
-          category: st.category || 'その他',
-          date: st.date,
-          completed: st.completed
-        });
-      });
-
-      try {
-        const syncBadge = document.getElementById('sync-status-badge');
-        syncBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-500 animate-ping mr-1"></span> 双方向同期中...`;
-
-        const response = await fetch(GAS_WEB_APP_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ tasks: exportTasks })
-        });
-
-        const result = await response.json();
-
-        if (result.status === "success") {
-          const googleTaskMap = new Map();
-          result.googleTasks.forEach(gt => googleTaskMap.set(gt.title, gt));
-
-          // 講義サイクルの同期反映
-          appData.lectures.forEach(lec => {
-            Object.keys(lec.blocks).forEach(key => {
-              const b = lec.blocks[key];
-              const fullTitle = lec.category ? `[${lec.category}] ${lec.title} - ${b.label}` : `${lec.title} - ${b.label}`;
-              const gTask = googleTaskMap.get(fullTitle);
-              if (gTask) {
-                b.completed = gTask.completed;
-              }
-            });
-          });
-
-          // 単体タスクの同期反映
-          appData.otherTasks.forEach(st => {
-            const fullTitle = st.category ? `[${st.category}] ${st.title}` : st.title;
-            const gTask = googleTaskMap.get(fullTitle);
-            if (gTask) {
-              st.completed = gTask.completed;
-            }
-          });
-
-          saveLocalData();
-          renderCurrentView();
-          alert("Google ToDo リストとの同期が完了しました！");
-        } else {
-          alert("エラーが発生しました: " + result.message);
-        }
-
-        updateSyncStatus(true);
-      } catch (err) {
-        console.error("GAS連携エラー:", err);
-        alert("Google ToDo リストとの通信に失敗しました。");
-        updateSyncStatus(true);
-      }
     }
 
     /* 日付ユーティリティ */
